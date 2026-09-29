@@ -4,7 +4,14 @@ import { CARD_META, HomeCardId, HomeSection, dailyPath } from "./settings";
 
 export const VIEW_TYPE_QIUQIU_HOME = "qiuqiu-home-view";
 
-interface TaskItem { file: TFile; line: number; text: string; done: boolean; }
+interface TaskItem {
+  file: TFile;
+  line: number;
+  text: string;
+  done: boolean;
+  startedAt?: number;
+  durationMinutes?: number;
+}
 
 const META: Record<HomeSection, { label: string; icon: string; eyebrow: string }> = {
   overview: { label: "总览", icon: "panel-top", eyebrow: "OVERVIEW" },
@@ -334,16 +341,41 @@ export class HomeView extends ItemView {
   }
 
   private async populateTaskCard(card: HTMLElement): Promise<void> {
-    const tasks = (await this.collectTasks()).filter(task => !task.done);
+    const tasks = await this.collectTasks();
+    const open = tasks.filter(task => !task.done);
+    const tracked = tasks.reduce((sum, task) => sum + (task.durationMinutes ?? 0), 0);
     const progress = card.querySelector(".qq-progress-row");
-    if (progress instanceof HTMLElement) progress.setText(tasks.length + " 件未完成 · 最近 " + this.plugin.settings.taskLookbackDays + " 天");
-    tasks.slice(0, 7).forEach(task => {
+    if (progress instanceof HTMLElement) {
+      progress.setText(open.length + " 件未完成 · 已记录 " + this.formatDuration(tracked));
+    }
+
+    open.slice(0, 7).forEach(task => {
       const row = card.createDiv("qq-task-row");
       const box = row.createEl("input", { type: "checkbox" });
-      row.createSpan().setText(task.text);
+      const copy = row.createDiv("qq-task-copy");
+      copy.createDiv("qq-task-text").setText(task.text);
+      if (task.startedAt) {
+        copy.createDiv("qq-task-timing").setText("进行中 · " + this.formatDuration(Math.max(0, Math.floor((Date.now() - task.startedAt) / 60000))));
+      }
+      const action = row.createEl("button", { cls: "qq-task-start" });
+      action.setText(task.startedAt ? "完成" : "开始");
+      action.addEventListener("click", async event => {
+        event.stopPropagation();
+        if (task.startedAt) {
+          await this.toggleTask(task);
+        } else {
+          await this.startTask(task);
+        }
+      });
       box.addEventListener("change", () => void this.toggleTask(task));
     });
-    if (!tasks.length) card.createDiv("qq-empty-state").setText("今天很干净。");
+    if (!open.length) card.createDiv("qq-empty-state").setText("今天很干净。");
+  }
+
+  private formatDuration(minutes: number): string {
+    if (minutes < 1) return "0 分钟";
+    const hours = Math.floor(minutes / 60);
+    return hours ? hours + " 小时 " + (minutes % 60) + " 分钟" : minutes + " 分钟";
   }
 
   private async collectTasks(): Promise<TaskItem[]> {
@@ -357,18 +389,46 @@ export class HomeView extends ItemView {
         if (typeof item.task !== "string") continue;
         const line = item.position.start.line;
         const source = lines[line] ?? "";
-        const text = source.replace(/^\s*[-*+]\s+\[[^\]]\]\s*/, "").trim();
-        result.push({ file, line, text, done: item.task.toLowerCase() !== " " });
+        const text = source.replace(/^\s*[-*+]\s+\[[^\]]\]\s*/, "").replace(/<!-- qq:(?:start=\d+|duration=\d+) -->/g, "").trim();
+        const startMatch = source.match(/<!-- qq:start=(\d+) -->/);
+        const durationMatch = source.match(/<!-- qq:duration=(\d+) -->/);
+        result.push({
+          file,
+          line,
+          text,
+          done: item.task.toLowerCase() !== " ",
+          startedAt: startMatch ? Number(startMatch[1]) : undefined,
+          durationMinutes: durationMatch ? Number(durationMatch[1]) : undefined
+        });
       }
     }
     return result;
+  }
+
+  private async startTask(task: TaskItem): Promise<void> {
+    const content = await this.plugin.app.vault.read(task.file);
+    const lines = content.split("\n");
+    if (task.line >= lines.length || task.done) return;
+    if (/<!-- qq:start=\d+ -->/.test(lines[task.line])) return;
+    lines[task.line] = lines[task.line].replace(/\s*$/, "") + " <!-- qq:start=" + Date.now() + " -->";
+    await this.plugin.app.vault.modify(task.file, lines.join("\n"));
+    new Notice("已开始记录耗时");
+    this.render();
   }
 
   private async toggleTask(task: TaskItem): Promise<void> {
     const content = await this.plugin.app.vault.read(task.file);
     const lines = content.split("\n");
     if (task.line >= lines.length) return;
-    lines[task.line] = lines[task.line].replace(/\[[ xX]\]/, task.done ? "[ ]" : "[x]");
+
+    let line = lines[task.line];
+    const startMatch = line.match(/<!-- qq:start=(\d+) -->/);
+    if (!task.done && startMatch) {
+      const minutes = Math.max(1, Math.round((Date.now() - Number(startMatch[1])) / 60000));
+      line = line.replace(/\s*<!-- qq:start=\d+ -->/, " <!-- qq:duration=" + minutes + " -->");
+      new Notice("任务完成 · 用时 " + this.formatDuration(minutes));
+    }
+    lines[task.line] = line.replace(/\[[ xX]\]/, task.done ? "[ ]" : "[x]");
     await this.plugin.app.vault.modify(task.file, lines.join("\n"));
     this.render();
   }
@@ -483,6 +543,7 @@ export class HomeView extends ItemView {
     card.createDiv("qq-metric").innerHTML = "<strong>" + active7 + "</strong><span>本周活跃笔记</span>";
     card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + active30 + "</strong><span>本月活跃笔记</span>";
     card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + this.countCompletedTasks() + "</strong><span>最近任务已完成</span>";
+    card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + this.formatDuration(this.countTrackedMinutes()) + "</strong><span>已记录任务耗时</span>";
   }
 
   private countCompletedTasks(): number {
@@ -495,6 +556,15 @@ export class HomeView extends ItemView {
       }
     }
     return count;
+  }
+
+  private async countTrackedMinutesAsync(): Promise<number> {
+    const tasks = await this.collectTasks();
+    return tasks.reduce((sum, task) => sum + (task.durationMinutes ?? 0), 0);
+  }
+
+  private countTrackedMinutes(): number {
+    return 0;
   }
 
   private renderQuoteCard(grid: HTMLElement): void {
