@@ -543,7 +543,7 @@ export class HomeView extends ItemView {
     card.createDiv("qq-metric").innerHTML = "<strong>" + active7 + "</strong><span>本周活跃笔记</span>";
     card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + active30 + "</strong><span>本月活跃笔记</span>";
     card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + this.countCompletedTasks() + "</strong><span>最近任务已完成</span>";
-    card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + this.formatDuration(this.countTrackedMinutes()) + "</strong><span>已记录任务耗时</span>";
+
   }
 
   private countCompletedTasks(): number {
@@ -556,15 +556,6 @@ export class HomeView extends ItemView {
       }
     }
     return count;
-  }
-
-  private async countTrackedMinutesAsync(): Promise<number> {
-    const tasks = await this.collectTasks();
-    return tasks.reduce((sum, task) => sum + (task.durationMinutes ?? 0), 0);
-  }
-
-  private countTrackedMinutes(): number {
-    return 0;
   }
 
   private renderQuoteCard(grid: HTMLElement): void {
