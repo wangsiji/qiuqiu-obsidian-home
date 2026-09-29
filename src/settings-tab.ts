@@ -1,5 +1,13 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type QiuqiuHomePlugin from "./main";
+import { CARD_META, HomeCardId, HomeSection } from "./settings";
+
+const SECTION_LABELS: Record<HomeSection, string> = {
+  overview: "总览",
+  action: "行动",
+  knowledge: "知识",
+  life: "生活"
+};
 
 export class QiuqiuSettingTab extends PluginSettingTab {
   plugin: QiuqiuHomePlugin;
@@ -69,5 +77,123 @@ export class QiuqiuSettingTab extends PluginSettingTab {
         this.plugin.settings.quote = value;
         await this.plugin.saveSettings();
       }));
+
+    this.renderLayout(el);
+    this.renderQuickLinks(el);
+    this.renderAreas(el);
+  }
+
+  private renderLayout(el: HTMLElement): void {
+    el.createEl("h3", { text: "首页布局" });
+    el.createEl("p", { text: "首页卡片可以隐藏，也可以直接拖动排序。顺序会保存到插件设置中。" });
+
+    (Object.keys(SECTION_LABELS) as HomeSection[]).forEach(section => {
+      const group = el.createDiv("qq-settings-group");
+      group.createEl("h4", { text: SECTION_LABELS[section] });
+      const order = this.plugin.settings.cardOrder[section] ?? [];
+
+      order.forEach((id, index) => {
+        const row = group.createDiv("qq-settings-card-row");
+        row.createSpan("qq-settings-drag").setText("⋮⋮");
+        const copy = row.createDiv();
+        copy.createDiv("qq-settings-card-title").setText(CARD_META[id].title);
+        copy.createDiv("qq-settings-card-id").setText(id);
+
+        const toggle = row.createEl("input", { type: "checkbox" });
+        toggle.checked = !this.plugin.settings.hiddenCards.includes(id);
+        toggle.setAttribute("aria-label", "显示 " + CARD_META[id].title);
+        toggle.addEventListener("change", async () => {
+          const hidden = new Set(this.plugin.settings.hiddenCards);
+          if (toggle.checked) hidden.delete(id);
+          else hidden.add(id);
+          this.plugin.settings.hiddenCards = [...hidden];
+          await this.plugin.saveSettings();
+        });
+
+        const moveUp = row.createEl("button", { text: "↑", cls: "qq-settings-move" });
+        moveUp.disabled = index === 0;
+        moveUp.addEventListener("click", async () => {
+          if (index === 0) return;
+          const next = [...order];
+          [next[index - 1], next[index]] = [next[index], next[index - 1]];
+          this.plugin.settings.cardOrder[section] = next;
+          await this.plugin.saveSettings();
+          this.display();
+        });
+
+        const moveDown = row.createEl("button", { text: "↓", cls: "qq-settings-move" });
+        moveDown.disabled = index === order.length - 1;
+        moveDown.addEventListener("click", async () => {
+          if (index >= order.length - 1) return;
+          const next = [...order];
+          [next[index + 1], next[index]] = [next[index], next[index + 1]];
+          this.plugin.settings.cardOrder[section] = next;
+          await this.plugin.saveSettings();
+          this.display();
+        });
+      });
+    });
+  }
+
+  private renderQuickLinks(el: HTMLElement): void {
+    el.createEl("h3", { text: "快捷入口" });
+    el.createEl("p", { text: "这里管理首页“快捷入口”卡片。target 使用 Vault 相对路径，也可以填写 http/https 地址。" });
+
+    this.plugin.settings.links.forEach((link, index) => {
+      const box = el.createDiv("qq-settings-link");
+      new Setting(box)
+        .setName("入口 " + (index + 1))
+        .addText(t => t.setPlaceholder("名称").setValue(link.label).onChange(async value => {
+          link.label = value;
+          await this.plugin.saveSettings();
+        }))
+        .addText(t => t.setPlaceholder("路径 / URL").setValue(link.target).onChange(async value => {
+          link.target = value.trim();
+          await this.plugin.saveSettings();
+        }))
+        .addText(t => t.setPlaceholder("图标").setValue(link.icon).onChange(async value => {
+          link.icon = value.trim() || "link";
+          await this.plugin.saveSettings();
+        }))
+        .addExtraButton(b => b.setIcon("trash-2").setTooltip("删除").onClick(async () => {
+          this.plugin.settings.links.splice(index, 1);
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+    });
+
+    new Setting(el)
+      .setName("新增快捷入口")
+      .setDesc("从一个空入口开始编辑。")
+      .addButton(b => b.setButtonText("新增").onClick(async () => {
+        this.plugin.settings.links.push({
+          id: "link-" + Date.now(),
+          label: "新入口",
+          target: "",
+          icon: "link",
+          type: "file"
+        });
+        await this.plugin.saveSettings();
+        this.display();
+      }));
+  }
+
+  private renderAreas(el: HTMLElement): void {
+    el.createEl("h3", { text: "人生领域" });
+    el.createEl("p", { text: "配置领域对应的 Vault 目录后，首页会显示任务完成情况与入口。" });
+
+    this.plugin.settings.areas.forEach(area => {
+      new Setting(el)
+        .setName(area.name)
+        .setDesc("目录：" + (area.path || "未配置"))
+        .addText(t => t.setPlaceholder("例如 20-工作").setValue(area.path).onChange(async value => {
+          area.path = value.trim().replace(/^\/+|\/+$/g, "");
+          await this.plugin.saveSettings();
+        }))
+        .addColorPicker(c => c.setValue(area.color).onChange(async value => {
+          area.color = value;
+          await this.plugin.saveSettings();
+        }));
+    });
   }
 }
