@@ -150,8 +150,11 @@ export class HomeView extends ItemView {
     setIcon(settings, "settings-2");
     settings.setAttribute("aria-label", "打开插件设置");
     settings.addEventListener("click", () => {
-      this.app.setting.open();
-      this.app.setting.openTabById(this.plugin.manifest.id);
+      const app = this.app as typeof this.app & {
+        setting?: { open: () => void; openTabById: (id: string) => void };
+      };
+      app.setting?.open();
+      app.setting?.openTabById(this.plugin.manifest.id);
     });
   }
 
