@@ -51,8 +51,23 @@ export default class QiuqiuHomePlugin extends Plugin {
     return leaf.view instanceof HomeView ? leaf.view : null;
   }
 
+  async ensureFolder(path: string): Promise<void> {
+    const clean = path.replace(/^\/+/g, "").replace(/\/+$/g, "");
+    if (!clean) return;
+    const parts = clean.split("/").filter(Boolean);
+    let current = "";
+    for (const part of parts) {
+      current = current ? current + "/" + part : part;
+      if (!(this.app.vault.getAbstractFileByPath(current))) {
+        await this.app.vault.createFolder(current);
+      }
+    }
+  }
+
   async openToday(): Promise<void> {
     const path = dailyPath(this.settings);
+    const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+    await this.ensureFolder(parent);
     let file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) {
       try {
