@@ -1,6 +1,6 @@
 import { ItemView, Notice, TFile, WorkspaceLeaf, moment, setIcon } from "obsidian";
 import type QiuqiuHomePlugin from "./main";
-import { HomeSection, dailyPath } from "./settings";
+import { CARD_META, HomeCardId, HomeSection, dailyPath } from "./settings";
 
 export const VIEW_TYPE_QIUQIU_HOME = "qiuqiu-home-view";
 
@@ -90,16 +90,6 @@ export class HomeView extends ItemView {
         results.empty();
       }
     });
-
-    window.setTimeout(() => {
-      if (!this.searchInput) return;
-      this.searchInput.addEventListener("keydown", event => {
-        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-          event.preventDefault();
-          this.focusSearch();
-        }
-      });
-    }, 0);
   }
 
   private renderSearchResults(query: string, results: HTMLElement): void {
@@ -135,8 +125,9 @@ export class HomeView extends ItemView {
       return;
     }
 
+    const safeName = clean.replace(/[\\/:*?"<>|]/g, "-").trim();
     const folder = this.plugin.settings.newNoteFolder;
-    const path = folder ? folder + "/" + clean + ".md" : clean + ".md";
+    const path = folder ? folder + "/" + safeName + ".md" : safeName + ".md";
     try {
       const file = await this.plugin.app.vault.create(path, "# " + clean + "\n\n");
       await this.plugin.app.workspace.getLeaf("tab").openFile(file);
@@ -158,7 +149,10 @@ export class HomeView extends ItemView {
     const settings = nav.createDiv("qq-nav-settings");
     setIcon(settings, "settings-2");
     settings.setAttribute("aria-label", "打开插件设置");
-    settings.addEventListener("click", () => this.plugin.openSettings());
+    settings.addEventListener("click", () => {
+      this.app.setting.open();
+      this.app.setting.openTabById(this.plugin.manifest.id);
+    });
   }
 
   private renderSection(parent: HTMLElement, section: HomeSection): void {
@@ -172,10 +166,27 @@ export class HomeView extends ItemView {
     setIcon(icon, META[section].icon);
 
     const grid = wrapper.createDiv("qq-card-grid");
-    if (section === "overview") this.renderOverview(grid);
-    if (section === "action") this.renderAction(grid);
-    if (section === "knowledge") this.renderKnowledge(grid);
-    if (section === "life") this.renderLife(grid);
+    const order = this.plugin.settings.cardOrder[section] ?? [];
+    order.filter(id => CARD_META[id].section === section && !this.plugin.settings.hiddenCards.includes(id))
+      .forEach(id => this.renderCardById(grid, id));
+  }
+
+  private renderCardById(grid: HTMLElement, id: HomeCardId): void {
+    switch (id) {
+      case "overview.daily": this.renderDailyCard(grid); break;
+      case "overview.capture": this.renderCaptureCard(grid); break;
+      case "overview.links": this.renderQuickLinks(grid); break;
+      case "overview.recent": this.renderRecentCard(grid); break;
+      case "action.focus": this.renderFocusCard(grid); break;
+      case "action.tasks": this.renderTaskCard(grid); break;
+      case "action.projects": this.renderProjectsCard(grid); break;
+      case "knowledge.flow": this.renderKnowledgeCard(grid); break;
+      case "knowledge.review": this.renderReviewCard(grid); break;
+      case "knowledge.stats": this.renderStatsCard(grid); break;
+      case "life.areas": this.renderAreaCard(grid); break;
+      case "life.rhythm": this.renderLifeMetrics(grid); break;
+      case "life.quote": this.renderQuoteCard(grid); break;
+    }
   }
 
   private card(parent: HTMLElement, title: string, icon: string, cls = ""): HTMLElement {
@@ -185,31 +196,6 @@ export class HomeView extends ItemView {
     setIcon(titleEl.createSpan(), icon);
     titleEl.createSpan().setText(title);
     return card;
-  }
-
-  private renderOverview(grid: HTMLElement): void {
-    this.renderDailyCard(grid);
-    this.renderCaptureCard(grid);
-    this.renderQuickLinks(grid);
-    this.renderRecentCard(grid);
-  }
-
-  private renderAction(grid: HTMLElement): void {
-    this.renderFocusCard(grid);
-    this.renderTaskCard(grid);
-    this.renderProjectsCard(grid);
-  }
-
-  private renderKnowledge(grid: HTMLElement): void {
-    this.renderKnowledgeCard(grid);
-    this.renderReviewCard(grid);
-    this.renderStatsCard(grid);
-  }
-
-  private renderLife(grid: HTMLElement): void {
-    this.renderAreaCard(grid);
-    this.renderLifeMetrics(grid);
-    this.renderQuoteCard(grid);
   }
 
   private renderDailyCard(grid: HTMLElement): void {
@@ -223,6 +209,19 @@ export class HomeView extends ItemView {
     this.button(actions, "打开日记", "arrow-up-right", () => void this.plugin.openToday());
     if (file instanceof TFile) card.createDiv("qq-stat-line").setText("最后编辑 · " + moment(file.stat.mtime).fromNow());
     else card.createDiv("qq-muted qq-spaced").setText("今天还没有记录。");
+    const streak = this.dailyStreak();
+    card.createDiv("qq-streak").setText("连续记录 " + streak + " 天");
+  }
+
+  private dailyStreak(): number {
+    let streak = 0;
+    const cursor = new Date();
+    for (let i = 0; i < 365; i++) {
+      if (!(this.plugin.app.vault.getAbstractFileByPath(dailyPath(this.plugin.settings, cursor)) instanceof TFile)) break;
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
   }
 
   private renderCaptureCard(grid: HTMLElement): void {
@@ -307,12 +306,14 @@ export class HomeView extends ItemView {
       if (file.stat.mtime < cutoff) continue;
       const items = this.plugin.app.metadataCache.getFileCache(file)?.listItems ?? [];
       for (const item of items) {
-        if (item.task === undefined) continue;
+        if (typeof item.task !== "string") continue;
+        const match = item.task.match(/^([ xX])(?:\\s+)?(.*)$/);
+        if (!match) continue;
         result.push({
           file,
           line: item.position.start.line,
-          text: item.task.replace(/^\[[ xX]\]\s*/, "").trim(),
-          done: /^x$/i.test(item.task)
+          text: match[2].trim(),
+          done: match[1].toLowerCase() === "x"
         });
       }
     }
@@ -336,9 +337,25 @@ export class HomeView extends ItemView {
       dot.style.backgroundColor = area.color;
       const copy = row.createDiv();
       copy.createDiv("qq-area-name").setText(area.name);
-      copy.createDiv("qq-area-meta").setText(area.path ? this.countNotes(area.path) + " 篇笔记" : "尚未配置路径");
+      const total = area.path ? this.countAreaTasks(area.path) : 0;
+      const done = area.path ? this.countAreaTasks(area.path, true) : 0;
+      copy.createDiv("qq-area-meta").setText(area.path ? done + " / " + total + " 个任务完成" : "尚未配置路径");
       if (area.path) row.addEventListener("click", () => void this.plugin.openTarget(area.path));
     });
+  }
+
+  private countAreaTasks(path: string, doneOnly = false): number {
+    let count = 0;
+    for (const file of this.plugin.app.vault.getMarkdownFiles()) {
+      if (!(file.path.startsWith(path + "/") || file.path === path)) continue;
+      for (const item of this.plugin.app.metadataCache.getFileCache(file)?.listItems ?? []) {
+        if (typeof item.task !== "string") continue;
+        const match = item.task.match(/^([ xX])/);
+        if (!match) continue;
+        if (!doneOnly || match[1].toLowerCase() === "x") count++;
+      }
+    }
+    return count;
   }
 
   private countNotes(path: string): number {
@@ -365,17 +382,28 @@ export class HomeView extends ItemView {
   }
 
   private renderReviewCard(grid: HTMLElement): void {
-    const card = this.card(grid, "随机回顾", "shuffle");
-    const files = this.plugin.app.vault.getMarkdownFiles()
-      .filter(file => file.stat.mtime < Date.now() - 30 * 86400000);
-    if (!files.length) {
-      card.createDiv("qq-empty-state").setText("积累一些旧笔记后，这里会开始工作。");
-      return;
-    }
-    const file = files[Math.floor(Math.random() * files.length)];
-    card.createDiv("qq-review-title").setText(file.basename);
-    card.createDiv("qq-muted").setText(file.path);
-    this.button(card, "打开回顾", "arrow-up-right", () => void this.plugin.app.workspace.getLeaf("tab").openFile(file));
+    const card = this.card(grid, "回顾入口", "calendar-range");
+    const weekStart = this.startOfWeek(new Date());
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const weekFiles = this.plugin.app.vault.getMarkdownFiles().filter(f => f.stat.mtime >= weekStart.getTime()).length;
+    const monthFiles = this.plugin.app.vault.getMarkdownFiles().filter(f => f.stat.mtime >= monthStart.getTime()).length;
+    card.createDiv("qq-review-metric").setText("本周活跃 · " + weekFiles + " 篇");
+    card.createDiv("qq-review-metric").setText("本月活跃 · " + monthFiles + " 篇");
+    this.button(card, "随机打开旧笔记", "shuffle", () => {
+      const files = this.plugin.app.vault.getMarkdownFiles().filter(file => file.stat.mtime < Date.now() - 30 * 86400000);
+      if (!files.length) { new Notice("还没有足够久的旧笔记。"); return; }
+      const file = files[Math.floor(Math.random() * files.length)];
+      void this.plugin.app.workspace.getLeaf("tab").openFile(file);
+    });
+  }
+
+  private startOfWeek(date: Date): Date {
+    const result = new Date(date);
+    const day = result.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    result.setDate(result.getDate() + diff);
+    result.setHours(0, 0, 0, 0);
+    return result;
   }
 
   private renderStatsCard(grid: HTMLElement): void {
@@ -383,12 +411,13 @@ export class HomeView extends ItemView {
     const files = this.plugin.app.vault.getMarkdownFiles();
     const active = files.filter(file => file.stat.mtime > Date.now() - 30 * 86400000).length;
     const links = Object.keys(this.plugin.app.metadataCache.resolvedLinks).length;
-    card.createDiv("qq-stat-grid").innerHTML = [
-      [String(files.length), "Markdown"],
-      [String(active), "近 30 天活跃"],
-      [String(links), "链接节点"],
-      [String(new Set(files.map(file => file.parent?.path ?? "")).size), "目录"]
-    ].map(([value, label]) => "<div><strong>" + value + "</strong><span>" + label + "</span></div>").join("");
+    const statGrid = card.createDiv("qq-stat-grid");
+    [[String(files.length), "Markdown"], [String(active), "近 30 天活跃"], [String(links), "链接节点"], [String(new Set(files.map(file => file.parent?.path ?? "")).size), "目录"]]
+      .forEach(([value, label]) => {
+        const cell = statGrid.createDiv();
+        cell.createEl("strong", { text: value });
+        cell.createEl("span", { text: label });
+      });
   }
 
   private renderAreaCard(grid: HTMLElement): void {
@@ -405,11 +434,11 @@ export class HomeView extends ItemView {
 
   private renderLifeMetrics(grid: HTMLElement): void {
     const card = this.card(grid, "节奏", "activity");
-    const files = this.plugin.app.vault.getMarkdownFiles();
-    const active7 = files.filter(file => file.stat.mtime > Date.now() - 7 * 86400000).length;
-    const active30 = files.filter(file => file.stat.mtime > Date.now() - 30 * 86400000).length;
+    const active7 = this.plugin.app.vault.getMarkdownFiles().filter(file => file.stat.mtime > Date.now() - 7 * 86400000).length;
+    const active30 = this.plugin.app.vault.getMarkdownFiles().filter(file => file.stat.mtime > Date.now() - 30 * 86400000).length;
     card.createDiv("qq-metric").innerHTML = "<strong>" + active7 + "</strong><span>本周活跃笔记</span>";
     card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + active30 + "</strong><span>本月活跃笔记</span>";
+    card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + this.collectTasks().filter(t => t.done).length + "</strong><span>最近任务已完成</span>";
   }
 
   private renderQuoteCard(grid: HTMLElement): void {
@@ -431,8 +460,8 @@ export class HomeView extends ItemView {
   private async upsertFrontmatter(path: string, key: string, value: string): Promise<void> {
     const existing = this.plugin.app.vault.getAbstractFileByPath(path);
     if (!(existing instanceof TFile)) {
-      await this.plugin.app.vault.create(path, "---\n" + key + ": " + JSON.stringify(value) + "\n---\n\n");
-      return;
+      await this.plugin.openToday();
+      return this.upsertFrontmatter(path, key, value);
     }
     const content = await this.plugin.app.vault.read(existing);
     const match = content.match(/^---\n([\s\S]*?)\n---/);
@@ -442,7 +471,7 @@ export class HomeView extends ItemView {
     }
     const line = key + ": " + JSON.stringify(value);
     const frontmatter = match[1];
-    const re = new RegExp("^" + key + ":.*$", "m");
+    const re = new RegExp("^" + key.replace(/[.*+?^{}()|[\\]\\\\]/g, "\\\\$&") + ":.*$", "m");
     const nextFrontmatter = re.test(frontmatter) ? frontmatter.replace(re, line) : frontmatter + "\n" + line;
     await this.plugin.app.vault.modify(existing, content.replace(match[0], "---\n" + nextFrontmatter + "\n---"));
   }
