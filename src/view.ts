@@ -168,7 +168,42 @@ export class HomeView extends ItemView {
     const grid = wrapper.createDiv("qq-card-grid");
     const order = this.plugin.settings.cardOrder[section] ?? [];
     order.filter(id => CARD_META[id].section === section && !this.plugin.settings.hiddenCards.includes(id))
-      .forEach(id => this.renderCardById(grid, id));
+      .forEach(id => {
+        const before = grid.childElementCount;
+        this.renderCardById(grid, id);
+        const card = grid.children[before] as HTMLElement | undefined;
+        if (card) this.enableCardDrag(card, section, id);
+      });
+  }
+
+  private enableCardDrag(card: HTMLElement, section: HomeSection, id: HomeCardId): void {
+    card.draggable = true;
+    card.dataset.cardId = id;
+    card.addEventListener("dragstart", event => {
+      card.classList.add("qq-card-dragging");
+      event.dataTransfer?.setData("text/plain", id);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => card.classList.remove("qq-card-dragging"));
+    card.addEventListener("dragover", event => {
+      event.preventDefault();
+      card.classList.add("qq-card-drag-over");
+    });
+    card.addEventListener("dragleave", () => card.classList.remove("qq-card-drag-over"));
+    card.addEventListener("drop", event => {
+      event.preventDefault();
+      card.classList.remove("qq-card-drag-over");
+      const from = event.dataTransfer?.getData("text/plain") as HomeCardId;
+      if (!from || from === id) return;
+      const order = [...this.plugin.settings.cardOrder[section]];
+      const fromIndex = order.indexOf(from);
+      const toIndex = order.indexOf(id);
+      if (fromIndex < 0 || toIndex < 0) return;
+      order.splice(fromIndex, 1);
+      order.splice(order.indexOf(id), 0, from);
+      this.plugin.settings.cardOrder[section] = order;
+      void this.plugin.saveSettings();
+    });
   }
 
   private renderCardById(grid: HTMLElement, id: HomeCardId): void {
