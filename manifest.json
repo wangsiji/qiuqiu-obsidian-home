@@ -1,0 +1,10 @@
+{
+  "id": "qiuqiu-obsidian-home",
+  "name": "Qiuqiu Home",
+  "version": "0.1.0",
+  "minAppVersion": "1.6.0",
+  "description": "A personal operating console for your Obsidian vault.",
+  "author": "siji",
+  "authorUrl": "https://github.com/wangsiji",
+  "isDesktopOnly": false
+}
