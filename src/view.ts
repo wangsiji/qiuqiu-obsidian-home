@@ -289,7 +289,10 @@ export class HomeView extends ItemView {
       const row = card.createDiv("qq-link-row");
       setIcon(row.createSpan("qq-link-icon"), link.icon || "link");
       row.createSpan().setText(link.label);
-      row.addEventListener("click", () => void this.plugin.openTarget(link.target));
+      row.addEventListener("click", () => {
+        if (link.id === "today") void this.plugin.openToday();
+        else void this.plugin.openTarget(link.target);
+      });
     });
   }
 
