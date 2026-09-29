@@ -144,6 +144,7 @@ export class HomeView extends ItemView {
     const folder = this.plugin.settings.newNoteFolder;
     const path = folder ? folder + "/" + safeName + ".md" : safeName + ".md";
     try {
+      await this.plugin.ensureFolder(folder);
       const file = await this.plugin.app.vault.create(path, "# " + clean + "\n\n");
       await this.plugin.app.workspace.getLeaf("tab").openFile(file);
     } catch {
@@ -579,6 +580,8 @@ export class HomeView extends ItemView {
   }
 
   private async appendToFile(path: string, line: string): Promise<void> {
+    const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+    await this.plugin.ensureFolder(parent);
     const existing = this.plugin.app.vault.getAbstractFileByPath(path);
     if (existing instanceof TFile) {
       const content = await this.plugin.app.vault.read(existing);
