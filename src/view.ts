@@ -34,7 +34,15 @@ export class HomeView extends ItemView {
   getDisplayText(): string { return "Qiuqiu Home"; }
   getIcon(): string { return "layout-dashboard"; }
 
-  async onOpen(): Promise<void> { this.render(); }
+  async onOpen(): Promise<void> {
+    this.render();
+    this.registerDomEvent(document, "keydown", event => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      if (this.app.workspace.activeLeaf?.view !== this) return;
+      event.preventDefault();
+      this.focusSearch();
+    });
+  }
   async onClose(): Promise<void> { this.root?.empty(); }
 
   focusSearch(): void {
@@ -410,7 +418,9 @@ export class HomeView extends ItemView {
     const lines = content.split("\n");
     if (task.line >= lines.length || task.done) return;
     if (/<!-- qq:start=\d+ -->/.test(lines[task.line])) return;
-    lines[task.line] = lines[task.line].replace(/\s*$/, "") + " <!-- qq:start=" + Date.now() + " -->";
+    lines[task.line] = lines[task.line]
+      .replace(/\s*<!-- qq:start=\d+ -->/, "")
+      .replace(/\s*$/, "") + " <!-- qq:start=" + Date.now() + " -->";
     await this.plugin.app.vault.modify(task.file, lines.join("\n"));
     new Notice("已开始记录耗时");
     this.render();
@@ -424,9 +434,13 @@ export class HomeView extends ItemView {
     let line = lines[task.line];
     const startMatch = line.match(/<!-- qq:start=(\d+) -->/);
     if (!task.done && startMatch) {
-      const minutes = Math.max(1, Math.round((Date.now() - Number(startMatch[1])) / 60000));
-      line = line.replace(/\s*<!-- qq:start=\d+ -->/, " <!-- qq:duration=" + minutes + " -->");
-      new Notice("任务完成 · 用时 " + this.formatDuration(minutes));
+      const elapsed = Math.max(1, Math.round((Date.now() - Number(startMatch[1])) / 60000));
+      const total = (task.durationMinutes ?? 0) + elapsed;
+      line = line
+        .replace(/\s*<!-- qq:start=\d+ -->/, "")
+        .replace(/\s*<!-- qq:duration=\d+ -->/, "")
+        .replace(/\s*$/, "") + " <!-- qq:duration=" + total + " -->";
+      new Notice("任务完成 · 本次 " + this.formatDuration(elapsed) + " · 累计 " + this.formatDuration(total));
     }
     lines[task.line] = line.replace(/\[[ xX]\]/, task.done ? "[ ]" : "[x]");
     await this.plugin.app.vault.modify(task.file, lines.join("\n"));
