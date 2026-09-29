@@ -77,3 +77,9 @@
 .qq-settings-card-row input[type="checkbox"] { margin-left:auto; }
 .qq-settings-move { min-width:28px; height:26px; padding:0; }
 .qq-settings-link { margin-bottom:8px; }
+
+.qq-task-row { display:flex; align-items:flex-start; gap:8px; }
+.qq-task-copy { flex:1; min-width:0; }
+.qq-task-text { line-height:1.45; }
+.qq-task-timing { margin-top:3px; color:var(--text-muted); font-size:10px; }
+.qq-task-start { flex:0 0 auto; padding:3px 8px; font-size:10px; }
