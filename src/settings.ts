@@ -2,6 +2,21 @@ import type { App } from "obsidian";
 
 export type HomeSection = "overview" | "action" | "knowledge" | "life";
 
+export type HomeCardId =
+  | "overview.daily"
+  | "overview.capture"
+  | "overview.links"
+  | "overview.recent"
+  | "action.focus"
+  | "action.tasks"
+  | "action.projects"
+  | "knowledge.flow"
+  | "knowledge.review"
+  | "knowledge.stats"
+  | "life.areas"
+  | "life.rhythm"
+  | "life.quote";
+
 export interface QuickLink {
   id: string;
   label: string;
@@ -26,9 +41,34 @@ export interface HomeSettings {
   areas: LifeArea[];
   links: QuickLink[];
   sectionOrder: HomeSection[];
+  cardOrder: Record<HomeSection, HomeCardId[]>;
+  hiddenCards: HomeCardId[];
   quote: string;
   taskLookbackDays: number;
 }
+
+export const CARD_META: Record<HomeCardId, { section: HomeSection; title: string }> = {
+  "overview.daily": { section: "overview", title: "今天" },
+  "overview.capture": { section: "overview", title: "快速捕获" },
+  "overview.links": { section: "overview", title: "快捷入口" },
+  "overview.recent": { section: "overview", title: "最近修改" },
+  "action.focus": { section: "action", title: "今日重点" },
+  "action.tasks": { section: "action", title: "行动清单" },
+  "action.projects": { section: "action", title: "进行中的领域" },
+  "knowledge.flow": { section: "knowledge", title: "知识流动" },
+  "knowledge.review": { section: "knowledge", title: "随机回顾" },
+  "knowledge.stats": { section: "knowledge", title: "库的状态" },
+  "life.areas": { section: "life", title: "人生领域" },
+  "life.rhythm": { section: "life", title: "节奏" },
+  "life.quote": { section: "life", title: "给自己的提醒" }
+};
+
+export const DEFAULT_CARD_ORDER: Record<HomeSection, HomeCardId[]> = {
+  overview: ["overview.daily", "overview.capture", "overview.links", "overview.recent"],
+  action: ["action.focus", "action.tasks", "action.projects"],
+  knowledge: ["knowledge.flow", "knowledge.review", "knowledge.stats"],
+  life: ["life.areas", "life.rhythm", "life.quote"]
+};
 
 export const DEFAULT_SETTINGS: HomeSettings = {
   openOnStartup: true,
@@ -48,18 +88,47 @@ export const DEFAULT_SETTINGS: HomeSettings = {
     { id: "projects", label: "项目", target: "", icon: "layers-3", type: "folder" }
   ],
   sectionOrder: ["overview", "action", "knowledge", "life"],
+  cardOrder: structuredClone(DEFAULT_CARD_ORDER),
+  hiddenCards: [],
   quote: "把注意力放回真正重要的事情上。",
   taskLookbackDays: 14
 };
 
+function isSection(value: unknown): value is HomeSection {
+  return value === "overview" || value === "action" || value === "knowledge" || value === "life";
+}
+
+function isCardId(value: unknown): value is HomeCardId {
+  return typeof value === "string" && value in CARD_META;
+}
+
+function normalizeCardOrder(raw: unknown): Record<HomeSection, HomeCardId[]> {
+  const source = raw && typeof raw === "object" ? raw as Partial<Record<HomeSection, unknown>> : {};
+  const result = structuredClone(DEFAULT_CARD_ORDER);
+  (Object.keys(result) as HomeSection[]).forEach(section => {
+    const value = source[section];
+    if (!Array.isArray(value)) return;
+    const valid = value.filter(isCardId).filter(id => CARD_META[id].section === section);
+    const missing = DEFAULT_CARD_ORDER[section].filter(id => !valid.includes(id));
+    result[section] = [...valid, ...missing];
+  });
+  return result;
+}
+
 export function normalizeSettings(raw: unknown): HomeSettings {
   const data = raw && typeof raw === "object" ? raw as Partial<HomeSettings> : {};
+  const sectionOrder = Array.isArray(data.sectionOrder)
+    ? data.sectionOrder.filter(isSection)
+    : [...DEFAULT_SETTINGS.sectionOrder];
+
   return {
     ...DEFAULT_SETTINGS,
     ...data,
     areas: Array.isArray(data.areas) ? data.areas : structuredClone(DEFAULT_SETTINGS.areas),
     links: Array.isArray(data.links) ? data.links : structuredClone(DEFAULT_SETTINGS.links),
-    sectionOrder: Array.isArray(data.sectionOrder) ? data.sectionOrder : [...DEFAULT_SETTINGS.sectionOrder],
+    sectionOrder: sectionOrder.length ? sectionOrder : [...DEFAULT_SETTINGS.sectionOrder],
+    cardOrder: normalizeCardOrder(data.cardOrder),
+    hiddenCards: Array.isArray(data.hiddenCards) ? data.hiddenCards.filter(isCardId) : [],
     taskLookbackDays: typeof data.taskLookbackDays === "number"
       ? Math.max(1, Math.min(60, Math.floor(data.taskLookbackDays)))
       : DEFAULT_SETTINGS.taskLookbackDays
