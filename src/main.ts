@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, HomeSettings, dailyPath, normalizeSettings } from "./
 import { QiuqiuSettingTab } from "./settings-tab";
 
 export default class QiuqiuHomePlugin extends Plugin {
-  settings: HomeSettings = structuredClone(DEFAULT_SETTINGS);
+  settings: HomeSettings = normalizeSettings(DEFAULT_SETTINGS);
 
   async onload(): Promise<void> {
     this.settings = normalizeSettings(await this.loadData());
