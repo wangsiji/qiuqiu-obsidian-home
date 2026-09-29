@@ -70,6 +70,15 @@ export const DEFAULT_CARD_ORDER: Record<HomeSection, HomeCardId[]> = {
   life: ["life.areas", "life.rhythm", "life.quote"]
 };
 
+function cloneCardOrder(source: Record<HomeSection, HomeCardId[]>): Record<HomeSection, HomeCardId[]> {
+  return {
+    overview: [...source.overview],
+    action: [...source.action],
+    knowledge: [...source.knowledge],
+    life: [...source.life]
+  };
+}
+
 export const DEFAULT_SETTINGS: HomeSettings = {
   openOnStartup: true,
   dailyFolder: "00-日记",
@@ -88,7 +97,7 @@ export const DEFAULT_SETTINGS: HomeSettings = {
     { id: "projects", label: "项目", target: "", icon: "layers-3", type: "folder" }
   ],
   sectionOrder: ["overview", "action", "knowledge", "life"],
-  cardOrder: structuredClone(DEFAULT_CARD_ORDER),
+  cardOrder: cloneCardOrder(DEFAULT_CARD_ORDER),
   hiddenCards: [],
   quote: "把注意力放回真正重要的事情上。",
   taskLookbackDays: 14
@@ -104,7 +113,7 @@ function isCardId(value: unknown): value is HomeCardId {
 
 function normalizeCardOrder(raw: unknown): Record<HomeSection, HomeCardId[]> {
   const source = raw && typeof raw === "object" ? raw as Partial<Record<HomeSection, unknown>> : {};
-  const result = structuredClone(DEFAULT_CARD_ORDER);
+  const result = cloneCardOrder(DEFAULT_CARD_ORDER);
   (Object.keys(result) as HomeSection[]).forEach(section => {
     const value = source[section];
     if (!Array.isArray(value)) return;
@@ -124,8 +133,8 @@ export function normalizeSettings(raw: unknown): HomeSettings {
   return {
     ...DEFAULT_SETTINGS,
     ...data,
-    areas: Array.isArray(data.areas) ? data.areas : structuredClone(DEFAULT_SETTINGS.areas),
-    links: Array.isArray(data.links) ? data.links : structuredClone(DEFAULT_SETTINGS.links),
+    areas: Array.isArray(data.areas) ? data.areas : DEFAULT_SETTINGS.areas.map(area => ({ ...area })),
+    links: Array.isArray(data.links) ? data.links : DEFAULT_SETTINGS.links.map(link => ({ ...link })),
     sectionOrder: sectionOrder.length ? sectionOrder : [...DEFAULT_SETTINGS.sectionOrder],
     cardOrder: normalizeCardOrder(data.cardOrder),
     hiddenCards: Array.isArray(data.hiddenCards) ? data.hiddenCards.filter(isCardId) : [],
