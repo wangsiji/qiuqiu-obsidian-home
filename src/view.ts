@@ -323,8 +323,13 @@ export class HomeView extends ItemView {
 
   private renderTaskCard(grid: HTMLElement): void {
     const card = this.card(grid, "行动清单", "list-checks");
-    const tasks = this.collectTasks().filter(task => !task.done);
-    card.createDiv("qq-progress-row").setText(tasks.length + " 件未完成 · 最近 " + this.plugin.settings.taskLookbackDays + " 天");
+    card.createDiv("qq-progress-row").setText("读取最近 " + this.plugin.settings.taskLookbackDays + " 天任务……");
+    void this.populateTaskCard(card);
+  }
+
+  private async populateTaskCard(card: HTMLElement): Promise<void> {
+    const tasks = (await this.collectTasks()).filter(task => !task.done);
+    card.querySelector(".qq-progress-row")?.setText(tasks.length + " 件未完成 · 最近 " + this.plugin.settings.taskLookbackDays + " 天");
     tasks.slice(0, 7).forEach(task => {
       const row = card.createDiv("qq-task-row");
       const box = row.createEl("input", { type: "checkbox" });
@@ -334,22 +339,19 @@ export class HomeView extends ItemView {
     if (!tasks.length) card.createDiv("qq-empty-state").setText("今天很干净。");
   }
 
-  private collectTasks(): TaskItem[] {
+  private async collectTasks(): Promise<TaskItem[]> {
     const cutoff = Date.now() - this.plugin.settings.taskLookbackDays * 86400000;
     const result: TaskItem[] = [];
     for (const file of this.plugin.app.vault.getMarkdownFiles()) {
       if (file.stat.mtime < cutoff) continue;
+      const lines = (await this.plugin.app.vault.read(file)).split("\n");
       const items = this.plugin.app.metadataCache.getFileCache(file)?.listItems ?? [];
       for (const item of items) {
         if (typeof item.task !== "string") continue;
-        const match = item.task.match(/^([ xX])(?:\\s+)?(.*)$/);
-        if (!match) continue;
-        result.push({
-          file,
-          line: item.position.start.line,
-          text: match[2].trim(),
-          done: match[1].toLowerCase() === "x"
-        });
+        const line = item.position.start.line;
+        const source = lines[line] ?? "";
+        const text = source.replace(/^\s*[-*+]\s+\[[^\]]\]\s*/, "").trim();
+        result.push({ file, line, text, done: item.task.toLowerCase() !== " " });
       }
     }
     return result;
@@ -473,7 +475,19 @@ export class HomeView extends ItemView {
     const active30 = this.plugin.app.vault.getMarkdownFiles().filter(file => file.stat.mtime > Date.now() - 30 * 86400000).length;
     card.createDiv("qq-metric").innerHTML = "<strong>" + active7 + "</strong><span>本周活跃笔记</span>";
     card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + active30 + "</strong><span>本月活跃笔记</span>";
-    card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + this.collectTasks().filter(t => t.done).length + "</strong><span>最近任务已完成</span>";
+    card.createDiv("qq-metric qq-spaced").innerHTML = "<strong>" + this.countCompletedTasks() + "</strong><span>最近任务已完成</span>";
+  }
+
+  private countCompletedTasks(): number {
+    const cutoff = Date.now() - this.plugin.settings.taskLookbackDays * 86400000;
+    let count = 0;
+    for (const file of this.plugin.app.vault.getMarkdownFiles()) {
+      if (file.stat.mtime < cutoff) continue;
+      for (const item of this.plugin.app.metadataCache.getFileCache(file)?.listItems ?? []) {
+        if (typeof item.task === "string" && item.task.toLowerCase() !== " ") count++;
+      }
+    }
+    return count;
   }
 
   private renderQuoteCard(grid: HTMLElement): void {
