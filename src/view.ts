@@ -329,7 +329,8 @@ export class HomeView extends ItemView {
 
   private async populateTaskCard(card: HTMLElement): Promise<void> {
     const tasks = (await this.collectTasks()).filter(task => !task.done);
-    card.querySelector(".qq-progress-row")?.setText(tasks.length + " 件未完成 · 最近 " + this.plugin.settings.taskLookbackDays + " 天");
+    const progress = card.querySelector(".qq-progress-row");
+    if (progress instanceof HTMLElement) progress.setText(tasks.length + " 件未完成 · 最近 " + this.plugin.settings.taskLookbackDays + " 天");
     tasks.slice(0, 7).forEach(task => {
       const row = card.createDiv("qq-task-row");
       const box = row.createEl("input", { type: "checkbox" });
