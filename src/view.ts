@@ -633,9 +633,9 @@ export class HomeView extends ItemView {
       for(const task of tasks){
         if(task.done && mode==="overdue") continue;
         const content=await this.plugin.app.vault.read(task.file);
-        const line=content.split("\\n")[task.line]??"";
+        const line=content.split("\n")[task.line]??"";
         const match=line.match(/(?:📅|⏳|🛫|due::)\\s*(\\d{4}-\\d{2}-\\d{2})/);
-        if(!match) { if(mode==="overdue" && !task.done) items.push(task); continue; }
+        if(!match) continue;
         const due=new Date(match[1]+"T23:59:59").getTime();
         const todayEnd=new Date(); todayEnd.setHours(23,59,59,999);
         const todayStart=new Date(); todayStart.setHours(0,0,0,0);
