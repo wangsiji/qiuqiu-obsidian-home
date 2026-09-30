@@ -612,7 +612,22 @@ export class HomeView extends ItemView {
 
   private renderTaskFilterCard(grid: HTMLElement, mode:"due"|"overdue"): void {
     const card=this.card(grid,mode==="due"?"今日到期":"逾期任务",mode==="due"?"calendar-clock":"alert-circle");
-    void this.collectPlainTasks().then(tasks=>{const items=tasks.filter(t=>{const source=this.plugin.app.metadataCache.getFileCache(t.file)?.listItems?.find(i=>i.position.start.line===t.line);return source? (mode==="due"?true:!t.done):false;}).filter(t=>mode==="overdue"?!t.done:t.file.path.includes(dailyPath(this.plugin.settings).split("/")[0]));items.slice(0,6).forEach(t=>this.renderTaskRow(card,t));if(!items.length)card.createDiv("qq-empty-state").setText("没有需要处理的任务。");});
+    void this.collectPlainTasks().then(async tasks=>{
+      const items: TaskItem[]=[];
+      for(const task of tasks){
+        if(task.done && mode==="overdue") continue;
+        const content=await this.plugin.app.vault.read(task.file);
+        const line=content.split("\\n")[task.line]??"";
+        const match=line.match(/(?:📅|⏳|🛫|due::)\\s*(\\d{4}-\\d{2}-\\d{2})/);
+        if(!match) { if(mode==="overdue" && !task.done) items.push(task); continue; }
+        const due=new Date(match[1]+"T23:59:59").getTime();
+        const todayEnd=new Date(); todayEnd.setHours(23,59,59,999);
+        const todayStart=new Date(); todayStart.setHours(0,0,0,0);
+        if(mode==="due" ? due>=todayStart.getTime() && due<=todayEnd.getTime() : due<todayStart.getTime()) items.push(task);
+      }
+      items.slice(0,6).forEach(t=>this.renderTaskRow(card,t));
+      if(!items.length) card.createDiv("qq-empty-state").setText("没有需要处理的任务。");
+    });
   }
 
   private renderNextActionsCard(grid: HTMLElement): void {
@@ -672,7 +687,7 @@ export class HomeView extends ItemView {
   }
 
   private renderTemplateCard(grid: HTMLElement): void {
-    const card=this.card(grid,"模板速建","copy-plus");const files=this.plugin.app.vault.getMarkdownFiles().filter(f=>f.path.startsWith(this.plugin.settings.templateFolder+"/")).slice(0,8);files.forEach(f=>this.button(card,f.basename,"file-plus",async()=>{const name=window.prompt("新笔记名称",f.basename);if(!name)return;const source=await this.plugin.app.vault.read(f);const path=(this.plugin.settings.newNoteFolder?this.plugin.settings.newNoteFolder+"/":"")+name.replace(/[\\/:*?"<>|]/g,"-")+".md";await this.plugin.ensureFolder(this.plugin.settings.newNoteFolder);await this.plugin.app.vault.create(path,source);await this.plugin.app.workspace.getLeaf("tab").openFile(path);}));
+    const card=this.card(grid,"模板速建","copy-plus");const files=this.plugin.app.vault.getMarkdownFiles().filter(f=>f.path.startsWith(this.plugin.settings.templateFolder+"/")).slice(0,8);files.forEach(f=>this.button(card,f.basename,"file-plus",async()=>{const name=window.prompt("新笔记名称",f.basename);if(!name)return;const source=await this.plugin.app.vault.read(f);const path=(this.plugin.settings.newNoteFolder?this.plugin.settings.newNoteFolder+"/":"")+name.replace(/[\\/:*?"<>|]/g,"-")+".md";await this.plugin.ensureFolder(this.plugin.settings.newNoteFolder);const created=await this.plugin.app.vault.create(path,source);await this.plugin.app.workspace.getLeaf("tab").openFile(created);}));
     if(!files.length)card.createDiv("qq-empty-state").setText("在 "+this.plugin.settings.templateFolder+" 放入 Markdown 模板。");
   }
 
