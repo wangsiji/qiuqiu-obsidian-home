@@ -99,3 +99,19 @@
 .qq-project-bar { height:5px; margin:7px 0 5px 17px; border-radius:99px; background:rgba(46,52,64,.08); overflow:hidden; }
 .qq-project-fill { height:100%; border-radius:inherit; background:var(--qq-accent); transition:width .2s ease; }
 .qq-project-meta { margin-left:17px; color:var(--qq-muted); font-size:10px; }
+
+/* Expanded module catalog */
+.qq-calendar-week,.qq-calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.qq-calendar-week { margin:8px 0 4px; color:var(--qq-muted); font-size:9px; text-align:center; }
+.qq-calendar-grid button { min-width:0; border:0; border-radius:7px; padding:5px 0; background:transparent; color:inherit; font-size:10px; cursor:pointer; }
+.qq-calendar-grid button:hover,.qq-calendar-today { background:var(--qq-accent-soft)!important; color:var(--qq-accent)!important; font-weight:700; }
+.qq-calendar-month { font-size:13px; font-weight:700; }
+.qq-timer-display { font-size:38px; font-variant-numeric:tabular-nums; letter-spacing:-.05em; font-weight:800; margin:10px 0; }
+.qq-heatmap { display:grid; grid-template-columns:repeat(14,1fr); gap:4px; margin-top:10px; }
+.qq-heat-cell { aspect-ratio:1; border-radius:3px; background:rgba(94,129,172,.08); }
+.qq-heat-cell[data-level="1"] { background:rgba(94,129,172,.2); }
+.qq-heat-cell[data-level="2"] { background:rgba(94,129,172,.35); }
+.qq-heat-cell[data-level="3"] { background:rgba(94,129,172,.55); }
+.qq-heat-cell[data-level="4"] { background:rgba(94,129,172,.8); }
+.qq-habit-row { margin-top:8px; color:var(--qq-muted); font-size:10px; }
+.qq-card input[type="datetime-local"],.qq-card input[type="url"],.qq-card input[type="text"],.qq-card input[type="search"] { width:100%; box-sizing:border-box; margin:5px 0; }
