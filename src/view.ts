@@ -655,8 +655,23 @@ export class HomeView extends ItemView {
     open.forEach(t=>{const row=card.createDiv("qq-note-row");row.createDiv("qq-note-title").setText(t.text);row.createDiv("qq-note-meta").setText(t.file.path);row.addEventListener("click",()=>void this.plugin.app.workspace.getLeaf("tab").openFile(t.file));});
   }
 
-  private tasksInPath(path:string): TaskItem[] {
-    const out:TaskItem[]=[]; for(const file of this.plugin.app.vault.getMarkdownFiles()){if(!(file.path.startsWith(path+"/")||file.path===path))continue;const lines=(this.plugin.app.metadataCache.getFileCache(file)?.listItems??[]).filter(i=>typeof i.task==="string");for(const item of lines){const source="";out.push({file,line:item.position.start.line,text:"任务 · "+file.basename,done:item.task?.toLowerCase()!==" "});}}return out;
+  private tasksInPath(path: string): TaskItem[] {
+    const out: TaskItem[] = [];
+    for (const file of this.plugin.app.vault.getMarkdownFiles()) {
+      if (!(file.path.startsWith(path + "/") || file.path === path)) continue;
+      const items = this.plugin.app.metadataCache.getFileCache(file)?.listItems ?? [];
+      for (const item of items) {
+        if (typeof item.task !== "string") continue;
+        out.push({
+          file,
+          line: item.position.start.line,
+          text: "任务 · " + file.basename,
+          done: item.task.toLowerCase() !== " ",
+          sessions: []
+        });
+      }
+    }
+    return out;
   }
 
   private renderMilestonesCard(grid: HTMLElement): void {
