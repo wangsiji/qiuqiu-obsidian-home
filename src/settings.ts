@@ -116,8 +116,7 @@ export function normalizeSettings(raw: unknown): HomeSettings {
   const sectionOrder=Array.isArray(data.sectionOrder)?data.sectionOrder.filter(isSection):[...DEFAULT_SETTINGS.sectionOrder];
   return {
     ...DEFAULT_SETTINGS,...data,
-    areas:Array.isArray(data.areas)?data.areas:DEFAULT_SETTINGS.areas.map(a=>({...a}),
-    ),
+    areas:Array.isArray(data.areas)?data.areas:DEFAULT_SETTINGS.areas.map(a=>({...a})),
     links:Array.isArray(data.links)?data.links:DEFAULT_SETTINGS.links.map(l=>({...l})),
     sectionOrder:sectionOrder.length?sectionOrder:[...DEFAULT_SETTINGS.sectionOrder],
     cardOrder:normalizeCardOrder(data.cardOrder),
