@@ -1,6 +1,7 @@
 import { ItemView, Notice, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import type QiuqiuHomePlugin from "./main";
 import { CARD_META, HomeCardId, HomeSection, dailyPath } from "./settings";
+import { collectGoals, collectMilestones, formatSessionMarker, parseTaskSessions, todaySessionMinutes, TaskSession } from "./models";
 
 export const VIEW_TYPE_QIUQIU_HOME = "qiuqiu-home-view";
 
@@ -12,6 +13,7 @@ interface TaskItem {
   startedAt?: number;
   durationMinutes?: number;
   completedAt?: number;
+  sessions: TaskSession[];
 }
 
 const META: Record<HomeSection, { label: string; icon: string; eyebrow: string }> = {
@@ -398,7 +400,7 @@ export class HomeView extends ItemView {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
     const todayDone = tasks.filter(task => task.completedAt && task.completedAt >= dayStart.getTime());
-    const todayTracked = todayDone.reduce((sum, task) => sum + (task.durationMinutes ?? 0), 0);
+    const todayTracked = todayDone.reduce((sum, task) => sum + todaySessionMinutes(task.sessions), 0);
     const ongoingMinutes = open
       .filter(task => task.startedAt)
       .reduce((sum, task) => sum + Math.max(0, Math.floor((now - Number(task.startedAt)) / 60000)), 0);
@@ -483,7 +485,7 @@ export class HomeView extends ItemView {
         if (typeof item.task !== "string") continue;
         const line = item.position.start.line;
         const source = lines[line] ?? "";
-        const text = source.replace(/^\s*[-*+]\s+\[[^\]]\]\s*/, "").replace(/<!-- qq:(?:start|duration|done)=\d+ -->/g, "").trim();
+        const text = source.replace(/^\s*[-*+]\s+\[[^\]]\]\s*/, "").replace(/<!-- qq:(?:start|duration|done)=\d+ -->/g, "").replace(/<!-- qq:sessions=[^ ]+ -->/g, "").trim();
         const startMatch = source.match(/<!-- qq:start=(\d+) -->/);
         const durationMatch = source.match(/<!-- qq:duration=(\d+) -->/);
         result.push({
@@ -493,6 +495,7 @@ export class HomeView extends ItemView {
           done: item.task.toLowerCase() !== " ",
           startedAt: startMatch ? Number(startMatch[1]) : undefined,
           durationMinutes: durationMatch ? Number(durationMatch[1]) : undefined,
+          sessions: parseTaskSessions(source),
           completedAt: this.readMarker(source, "done")
         });
       }
@@ -528,10 +531,12 @@ export class HomeView extends ItemView {
     if (!task.done && startMatch) {
       const elapsed = Math.max(1, Math.round((Date.now() - Number(startMatch[1])) / 60000));
       const total = (task.durationMinutes ?? 0) + elapsed;
+      const sessions = [...task.sessions, { startedAt: Number(startMatch[1]), minutes: elapsed }];
       line = line
         .replace(/\s*<!-- qq:start=\d+ -->/, "")
         .replace(/\s*<!-- qq:duration=\d+ -->/, "")
-        .replace(/\s*$/, "") + " <!-- qq:duration=" + total + " -->";
+        .replace(/\s*<!-- qq:sessions=[^ ]+ -->/, "")
+        .replace(/\s*$/, "") + " <!-- qq:duration=" + total + " -->" + formatSessionMarker(sessions);
       new Notice("任务完成 · 本次 " + this.formatDuration(elapsed) + " · 累计 " + this.formatDuration(total));
     }
     line = line.replace(/\s*<!-- qq:done=\d+ -->/, "");
@@ -655,12 +660,51 @@ export class HomeView extends ItemView {
   }
 
   private renderMilestonesCard(grid: HTMLElement): void {
-    const card=this.card(grid,"近期里程碑","milestone"); const files=this.plugin.app.vault.getMarkdownFiles().filter(f=>f.stat.mtime>Date.now()-30*86400000).sort((a,b)=>b.stat.mtime-a.stat.mtime).slice(0,6);
-    files.forEach(f=>{const row=card.createDiv("qq-note-row");row.createDiv("qq-note-title").setText(f.basename);row.createDiv("qq-note-meta").setText(window.moment(f.stat.mtime).fromNow());row.addEventListener("click",()=>void this.plugin.app.workspace.getLeaf("tab").openFile(f));});
+    const card = this.card(grid, "近期里程碑", "milestone");
+    const items = collectMilestones(this.plugin.app)
+      .filter(item => item.status !== "done" && item.status !== "completed")
+      .sort((a, b) => (a.due ?? "9999-12-31").localeCompare(b.due ?? "9999-12-31"))
+      .slice(0, 6);
+    items.forEach(item => {
+      const row = card.createDiv("qq-milestone-row");
+      const head = row.createDiv("qq-project-head");
+      head.createDiv("qq-project-name").setText(item.title);
+      if (item.progress !== undefined) head.createDiv("qq-project-percent").setText(item.progress + "%");
+      if (item.progress !== undefined) {
+        const bar = row.createDiv("qq-project-bar");
+        const fill = bar.createDiv("qq-project-fill");
+        fill.style.width = item.progress + "%";
+      }
+      row.createDiv("qq-project-meta").setText([item.project, item.due ? "截止 " + item.due : item.status].filter(Boolean).join(" · "));
+      row.addEventListener("click", () => void this.plugin.app.workspace.getLeaf("tab").openFile(item.file));
+    });
+    if (!items.length) card.createDiv("qq-empty-state").setText("没有正在推进的里程碑。用 type: milestone 创建一个。");
   }
 
   private renderGoalCard(grid: HTMLElement): void {
-    const card=this.card(grid,"目标进度","target"); const total=this.plugin.app.vault.getMarkdownFiles().length;const active=this.plugin.app.vault.getMarkdownFiles().filter(f=>f.stat.mtime>Date.now()-7*86400000).length;card.createDiv("qq-number").setText(total?Math.round(active/total*100)+"%":"0%");card.createDiv("qq-muted").setText("近 7 天活跃度，可作为目标执行温度计。");
+    const card = this.card(grid, "目标进度", "target");
+    const goals = collectGoals(this.plugin.app)
+      .filter(goal => goal.status !== "done" && goal.status !== "completed")
+      .sort((a, b) => (a.deadline ?? "9999-12-31").localeCompare(b.deadline ?? "9999-12-31"))
+      .slice(0, 4);
+    goals.forEach(goal => {
+      const row = card.createDiv("qq-goal-row");
+      const head = row.createDiv("qq-project-head");
+      head.createDiv("qq-project-name").setText(goal.title);
+      const hasProgress = goal.current !== undefined && goal.target !== undefined && goal.target !== 0;
+      if (hasProgress) {
+        const percent = Math.max(0, Math.min(100, Math.round((goal.current! / goal.target!) * 100)));
+        head.createDiv("qq-project-percent").setText(percent + "%");
+        const bar = row.createDiv("qq-project-bar");
+        const fill = bar.createDiv("qq-project-fill");
+        fill.style.width = percent + "%";
+        row.createDiv("qq-project-meta").setText(goal.current + " / " + goal.target + (goal.unit ? " " + goal.unit : "") + (goal.deadline ? " · 截止 " + goal.deadline : ""));
+      } else {
+        row.createDiv("qq-project-meta").setText([goal.status, goal.deadline ? "截止 " + goal.deadline : ""].filter(Boolean).join(" · "));
+      }
+      row.addEventListener("click", () => void this.plugin.app.workspace.getLeaf("tab").openFile(goal.file));
+    });
+    if (!goals.length) card.createDiv("qq-empty-state").setText("没有活动目标。用 type: goal 创建一个。");
   }
 
   private renderTimerCard(grid: HTMLElement): void {
@@ -864,17 +908,9 @@ export class HomeView extends ItemView {
       await this.plugin.openToday();
       return this.upsertFrontmatter(path, key, value);
     }
-    const content = await this.plugin.app.vault.read(existing);
-    const match = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) {
-      await this.plugin.app.vault.modify(existing, "---\n" + key + ": " + JSON.stringify(value) + "\n---\n\n" + content);
-      return;
-    }
-    const line = key + ": " + JSON.stringify(value);
-    const frontmatter = match[1];
-    const re = new RegExp("^" + key.replace(/[.*+?^{}()|[\\]\\\\]/g, "\\\\$&") + ":.*$", "m");
-    const nextFrontmatter = re.test(frontmatter) ? frontmatter.replace(re, line) : frontmatter + "\n" + line;
-    await this.plugin.app.vault.modify(existing, content.replace(match[0], "---\n" + nextFrontmatter + "\n---"));
+    await this.plugin.app.fileManager.processFrontMatter(existing, frontmatter => {
+      frontmatter[key] = value;
+    });
   }
 
   private button(parent: HTMLElement, label: string, icon: string, action: () => void | Promise<void>): HTMLElement {
