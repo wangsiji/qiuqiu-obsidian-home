@@ -78,6 +78,11 @@ export class QiuqiuSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
       }));
 
+    new Setting(el).setName("模板目录").setDesc("模板速建模块读取的 Markdown 目录。").addText(t=>t.setValue(this.plugin.settings.templateFolder).onChange(async v=>{this.plugin.settings.templateFolder=v.trim();await this.plugin.saveSettings();}));
+    new Setting(el).setName("常用片段文件").setDesc("常用片段模块读取的 Markdown 文件。").addText(t=>t.setValue(this.plugin.settings.snippetPath).onChange(async v=>{this.plugin.settings.snippetPath=v.trim();await this.plugin.saveSettings();}));
+    new Setting(el).setName("每日一问").addText(t=>t.setValue(this.plugin.settings.question).onChange(async v=>{this.plugin.settings.question=v.trim();await this.plugin.saveSettings();}));
+    new Setting(el).setName("天气城市").setDesc("例如 Tokyo、Shanghai。天气卡会按需请求公开天气服务。").addText(t=>t.setValue(this.plugin.settings.weatherCity).onChange(async v=>{this.plugin.settings.weatherCity=v.trim();await this.plugin.saveSettings();}));
+    new Setting(el).setName("笔记工作集目录").setDesc("可填写多个目录，用逗号分隔。").addText(t=>t.setValue(this.plugin.settings.worksetPaths.join(", ")).onChange(async v=>{this.plugin.settings.worksetPaths=v.split(",").map(x=>x.trim()).filter(Boolean);await this.plugin.saveSettings();}));
     this.renderLayout(el);
     this.renderQuickLinks(el);
     this.renderAreas(el);
