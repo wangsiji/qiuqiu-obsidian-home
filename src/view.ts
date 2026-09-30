@@ -413,7 +413,6 @@ export class HomeView extends ItemView {
           await this.startTask(task);
         }
       });
-      box.addEventListener("change", () => void this.toggleTask(task));
     box.checked = task.done;
     box.addEventListener("change", () => void this.toggleTask(task));
   }
