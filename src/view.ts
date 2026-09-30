@@ -353,6 +353,14 @@ export class HomeView extends ItemView {
   private async populateTaskCard(card: HTMLElement): Promise<void> {
     const tasks = await this.collectTasks();
     const open = tasks.filter(task => !task.done);
+    const now = Date.now();
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const todayDone = tasks.filter(task => task.completedAt && task.completedAt >= dayStart.getTime());
+    const todayTracked = todayDone.reduce((sum, task) => sum + (task.durationMinutes ?? 0), 0);
+    const ongoingMinutes = open
+      .filter(task => task.startedAt)
+      .reduce((sum, task) => sum + Math.max(0, Math.floor((now - Number(task.startedAt)) / 60000)), 0);
     const tracked = tasks.reduce((sum, task) => sum + (task.durationMinutes ?? 0), 0);
     const doing = open.filter(task => task.startedAt).sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
     const recentDone = tasks
@@ -361,13 +369,14 @@ export class HomeView extends ItemView {
       .slice(0, 3);
     const progress = card.querySelector(".qq-progress-row");
     if (progress instanceof HTMLElement) {
-      progress.setText(open.length + " 件未完成 · 已记录 " + this.formatDuration(tracked));
+      progress.setText("今日投入 " + this.formatDuration(todayTracked + ongoingMinutes) + " · " + open.length + " 件未完成");
     }
 
     const next = open.find(task => !task.startedAt) ?? open[0];
     if (next) {
       const nextRow = card.createDiv("qq-next-action");
       nextRow.createDiv("qq-next-label").setText("下一步");
+
       nextRow.createDiv("qq-next-text").setText(next.text);
       this.button(nextRow, next.startedAt ? "继续" : "开始", "play", () => void this.startTask(next));
     }
@@ -434,7 +443,7 @@ export class HomeView extends ItemView {
         if (typeof item.task !== "string") continue;
         const line = item.position.start.line;
         const source = lines[line] ?? "";
-        const text = source.replace(/^\s*[-*+]\s+\[[^\]]\]\s*/, "").replace(/<!-- qq:(?:start=\d+|duration=\d+) -->/g, "").trim();
+        const text = source.replace(/^\s*[-*+]\s+\[[^\]]\]\s*/, "").replace(/<!-- qq:(?:start|duration|done)=\d+ -->/g, "").trim();
         const startMatch = source.match(/<!-- qq:start=(\d+) -->/);
         const durationMatch = source.match(/<!-- qq:duration=(\d+) -->/);
         result.push({
@@ -443,7 +452,8 @@ export class HomeView extends ItemView {
           text,
           done: item.task.toLowerCase() !== " ",
           startedAt: startMatch ? Number(startMatch[1]) : undefined,
-          durationMinutes: durationMatch ? Number(durationMatch[1]) : undefined
+          durationMinutes: durationMatch ? Number(durationMatch[1]) : undefined,
+          completedAt: this.readMarker(source, "done")
         });
       }
     }
