@@ -77,7 +77,7 @@ export default class QiuqiuHomePlugin extends Plugin {
         return;
       }
     }
-    await this.app.workspace.getLeaf("tab").openFile(file);
+    if (file instanceof TFile) await this.app.workspace.getLeaf("tab").openFile(file);
   }
 
   async openTarget(target: string): Promise<void> {

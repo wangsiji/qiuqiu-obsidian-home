@@ -1,4 +1,4 @@
-import { ItemView, Notice, TFile, WorkspaceLeaf, moment, setIcon } from "obsidian";
+import { ItemView, Notice, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import type QiuqiuHomePlugin from "./main";
 import { CARD_META, HomeCardId, HomeSection, dailyPath } from "./settings";
 
@@ -262,7 +262,7 @@ export class HomeView extends ItemView {
     card.createDiv("qq-muted").setText(date.toLocaleDateString("zh-CN", { month: "long", weekday: "long" }));
     const actions = card.createDiv("qq-card-actions");
     this.button(actions, "打开日记", "arrow-up-right", () => void this.plugin.openToday());
-    if (file instanceof TFile) card.createDiv("qq-stat-line").setText("最后编辑 · " + moment(file.stat.mtime).fromNow());
+    if (file instanceof TFile) card.createDiv("qq-stat-line").setText("最后编辑 · " + window.moment(file.stat.mtime).fromNow());
     else card.createDiv("qq-muted qq-spaced").setText("今天还没有记录。");
     const streak = this.dailyStreak();
     card.createDiv("qq-streak").setText("连续记录 " + streak + " 天");
@@ -321,7 +321,7 @@ export class HomeView extends ItemView {
       .forEach(file => {
         const row = card.createDiv("qq-note-row");
         row.createDiv("qq-note-title").setText(file.basename);
-        row.createDiv("qq-note-meta").setText(moment(file.stat.mtime).fromNow());
+        row.createDiv("qq-note-meta").setText(window.moment(file.stat.mtime).fromNow());
         row.addEventListener("click", () => void this.plugin.app.workspace.getLeaf("tab").openFile(file));
       });
   }
@@ -396,7 +396,7 @@ export class HomeView extends ItemView {
       recentDone.forEach(task => {
         const row = card.createDiv("qq-task-done-row");
         row.createDiv("qq-task-text").setText(task.text);
-        row.createDiv("qq-task-timing").setText((task.durationMinutes ? this.formatDuration(task.durationMinutes) + " · " : "") + moment(task.completedAt).fromNow());
+        row.createDiv("qq-task-timing").setText((task.durationMinutes ? this.formatDuration(task.durationMinutes) + " · " : "") + window.moment(task.completedAt).fromNow());
       });
     }
 
