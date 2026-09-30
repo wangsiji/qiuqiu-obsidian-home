@@ -361,7 +361,6 @@ export class HomeView extends ItemView {
     const ongoingMinutes = open
       .filter(task => task.startedAt)
       .reduce((sum, task) => sum + Math.max(0, Math.floor((now - Number(task.startedAt)) / 60000)), 0);
-    const tracked = tasks.reduce((sum, task) => sum + (task.durationMinutes ?? 0), 0);
     const doing = open.filter(task => task.startedAt).sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
     const recentDone = tasks
       .filter(task => task.done && task.completedAt)
