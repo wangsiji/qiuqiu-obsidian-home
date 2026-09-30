@@ -90,3 +90,12 @@
 .qq-task-group-label { margin:12px 0 4px; }
 .qq-task-done-row { padding:7px 5px; border-radius:8px; }
 .qq-task-done-row .qq-task-text { font-size:11px; color:var(--qq-muted); }
+
+.qq-project-row { padding:9px 5px; border-radius:9px; cursor:pointer; }
+.qq-project-row:hover { background:rgba(94,129,172,.06); }
+.qq-project-head { display:flex; align-items:center; gap:8px; }
+.qq-project-name { font-size:12px; font-weight:650; flex:1; }
+.qq-project-percent { color:var(--qq-accent); font-size:11px; font-weight:750; font-variant-numeric:tabular-nums; }
+.qq-project-bar { height:5px; margin:7px 0 5px 17px; border-radius:99px; background:rgba(46,52,64,.08); overflow:hidden; }
+.qq-project-fill { height:100%; border-radius:inherit; background:var(--qq-accent); transition:width .2s ease; }
+.qq-project-meta { margin-left:17px; color:var(--qq-muted); font-size:10px; }
