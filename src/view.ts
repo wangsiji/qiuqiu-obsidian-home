@@ -517,7 +517,7 @@ export class HomeView extends ItemView {
   }
 
   private readMarker(source: string, marker: "start" | "duration" | "done"): number | undefined {
-    const match = source.match(new RegExp("<!-- qq:" + marker + "=(\\\\d+) -->"));
+    const match = source.match(new RegExp("<!-- qq:" + marker + "=(\\d+) -->"));
     return match ? Number(match[1]) : undefined;
   }
 
