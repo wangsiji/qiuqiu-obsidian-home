@@ -101,6 +101,7 @@ export class HomeView extends ItemView {
       this.renderSearchResults(query, results);
     });
     this.searchInput.addEventListener("keydown", event => {
+      if (event.key === "Enter" && event.shiftKey) { event.preventDefault(); void this.captureSearch(this.searchInput?.value ?? ""); return; }
       if (event.key === "Enter") void this.runSearch(this.searchInput?.value ?? "");
       if (event.key === "Escape") {
         this.searchInput!.value = "";
@@ -113,7 +114,12 @@ export class HomeView extends ItemView {
     results.empty();
     const q = query.toLowerCase();
     const files = this.plugin.app.vault.getMarkdownFiles()
-      .filter(file => file.basename.toLowerCase().includes(q) || file.path.toLowerCase().includes(q))
+      .filter(file => {
+        const cache=this.plugin.app.metadataCache.getFileCache(file);
+        const aliases=cache?.frontmatter?.aliases;
+        const aliasList=Array.isArray(aliases)?aliases.map(String):typeof aliases==="string"?[aliases]:[];
+        return file.basename.toLowerCase().includes(q) || file.path.toLowerCase().includes(q) || aliasList.some(alias=>alias.toLowerCase().includes(q));
+      })
       .sort((a, b) => b.stat.mtime - a.stat.mtime)
       .slice(0, 8);
 
@@ -130,6 +136,12 @@ export class HomeView extends ItemView {
       copy.createDiv("qq-search-row-path").setText(file.path);
       row.addEventListener("click", () => void this.plugin.app.workspace.getLeaf("tab").openFile(file));
     });
+  }
+
+  private async captureSearch(query: string): Promise<void> {
+    const clean=query.trim(); if(!clean)return;
+    try { await this.appendToFile(this.plugin.settings.inboxPath, "- "+clean); this.searchInput!.value=""; new Notice("已快速记录到 Inbox"); }
+    catch { new Notice("快速记录失败，请检查 Inbox 设置。"); }
   }
 
   private async runSearch(query: string): Promise<void> {
