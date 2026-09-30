@@ -56,6 +56,7 @@ export class HomeView extends ItemView {
     container.empty();
     container.addClass("qq-home-view");
     this.root = container.createDiv("qq-home");
+    if (this.plugin.settings.wallpaperUrl) this.root.style.backgroundImage = "linear-gradient(rgba(246,244,239,.82),rgba(246,244,239,.9)), url(" + JSON.stringify(this.plugin.settings.wallpaperUrl) + ")";
     this.renderHeader(this.root);
     this.renderSearch(this.root);
     this.renderNav(this.root);
@@ -71,8 +72,8 @@ export class HomeView extends ItemView {
     const brand = header.createDiv("qq-home-brand");
     brand.createDiv("qq-home-mark").setText("Q");
     const copy = brand.createDiv();
-    copy.createDiv("qq-home-title").setText("Qiuqiu Home");
-    copy.createDiv("qq-home-subtitle").setText("你的第二大脑，从这里开始。");
+    copy.createDiv("qq-home-title").setText(this.plugin.settings.homeTitle);
+    copy.createDiv("qq-home-subtitle").setText(this.plugin.settings.homeSubtitle);
 
     const meta = header.createDiv("qq-home-meta");
     const now = new Date();
