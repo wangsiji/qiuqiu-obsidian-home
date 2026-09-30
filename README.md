@@ -82,6 +82,39 @@ Qiuqiu Home 是位于 Obsidian Vault 与日常行动之间的一层个人操作�
 - [ ] AI 周回顾
 - [ ] Widget API
 
+## Vault-native 数据约定
+
+Goal 和 Milestone 不建立第二数据库，直接使用 Markdown frontmatter。
+
+### Goal
+
+```yaml
+---
+type: goal
+title: Marathon Sub-3
+status: active
+current: 210
+target: 180
+unit: min
+deadline: 2027-01-31
+---
+```
+
+### Milestone
+
+```yaml
+---
+type: milestone
+title: Running Dashboard v2
+project: Running Dashboard
+status: active
+progress: 70
+due: 2026-10-15
+---
+```
+
+任务耗时继续写在任务行的 inline marker 中；累计耗时使用 `qq:duration`，每次实际投入使用 `qq:sessions`，因此首页可以分别计算累计投入与今日投入。
+
 ## 本地开发
 
 运行 npm install 后执行 npm run build。
