@@ -503,16 +503,22 @@ export class HomeView extends ItemView {
   }
 
   private renderProjectsCard(grid: HTMLElement): void {
-    const card = this.card(grid, "进行中的领域", "layers-3");
-    this.plugin.settings.areas.slice(0, 4).forEach(area => {
-      const row = card.createDiv("qq-area-row");
-      const dot = row.createSpan("qq-area-dot");
+    const card = this.card(grid, "项目进度", "layers-3");
+    const areas = this.plugin.settings.areas.slice(0, 4);
+    areas.forEach(area => {
+      const row = card.createDiv("qq-project-row");
+      const head = row.createDiv("qq-project-head");
+      const dot = head.createSpan("qq-area-dot");
       dot.style.backgroundColor = area.color;
-      const copy = row.createDiv();
-      copy.createDiv("qq-area-name").setText(area.name);
+      head.createSpan("qq-project-name").setText(area.name);
       const total = area.path ? this.countAreaTasks(area.path) : 0;
       const done = area.path ? this.countAreaTasks(area.path, true) : 0;
-      copy.createDiv("qq-area-meta").setText(area.path ? done + " / " + total + " 个任务完成" : "尚未配置路径");
+      const progress = total ? Math.round(done / total * 100) : 0;
+      head.createSpan("qq-project-percent").setText(total ? progress + "%" : "—");
+      const bar = row.createDiv("qq-project-bar");
+      const fill = bar.createDiv("qq-project-fill");
+      fill.style.width = progress + "%";
+      row.createDiv("qq-project-meta").setText(area.path ? total + " 个任务 · " + done + " 已完成" : "尚未配置路径");
       if (area.path) row.addEventListener("click", () => void this.plugin.openTarget(area.path));
     });
   }
@@ -523,9 +529,8 @@ export class HomeView extends ItemView {
       if (!(file.path.startsWith(path + "/") || file.path === path)) continue;
       for (const item of this.plugin.app.metadataCache.getFileCache(file)?.listItems ?? []) {
         if (typeof item.task !== "string") continue;
-        const match = item.task.match(/^([ xX])/);
-        if (!match) continue;
-        if (!doneOnly || match[1].toLowerCase() === "x") count++;
+        const done = item.task.toLowerCase() !== " ";
+        if (!doneOnly || done) count++;
       }
     }
     return count;
