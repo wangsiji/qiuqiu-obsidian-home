@@ -87,7 +87,15 @@ export default class QiuqiuHomePlugin extends Plugin {
       await this.app.workspace.getLeaf("tab").openFile(file);
       return;
     }
-    if (target.startsWith("http://") || target.startsWith("https://")) {
+    if (file instanceof TFolder) {
+      const explorer = this.app.workspace.getLeavesOfType("file-explorer")[0];
+      if (explorer?.view && "revealInFolder" in explorer.view) {
+        try { (explorer.view as { revealInFolder: (file:TFile)=>void }).revealInFolder(this.app.vault.getMarkdownFiles().find(f=>f.path.startsWith(file.path+"/")) ?? this.app.vault.getMarkdownFiles()[0]); } catch { /* best effort */ }
+      }
+      new Notice("已定位到目录：" + target);
+      return;
+    }
+    if (target.startsWith("http://") || target.startsWith("https://") || target.startsWith("obsidian://")) {
       window.open(target, "_blank", "noopener,noreferrer");
       return;
     }
