@@ -117,3 +117,7 @@
 .qq-heat-cell[data-level="4"] { background:rgba(94,129,172,.8); }
 .qq-habit-row { margin-top:8px; color:var(--qq-muted); font-size:10px; }
 .qq-card input[type="datetime-local"],.qq-card input[type="url"],.qq-card input[type="text"],.qq-card input[type="search"] { width:100%; box-sizing:border-box; margin:5px 0; }
+
+
+.qq-goal-row,.qq-milestone-row { padding:9px 5px; border-radius:9px; cursor:pointer; }
+.qq-goal-row:hover,.qq-milestone-row:hover { background:rgba(94,129,172,.06); }
