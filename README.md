@@ -61,6 +61,8 @@ Qiuqiu Home 是位于 Obsidian Vault 与日常行动之间的一层个人操作�
 - [x] 日记连续性
 - [x] 完成任务耗时统计（轻量 inline marker，不引入独立数据库）
 - [x] 行动清单升级为下一步 / 进行中 / 待处理 / 最近完成
+- [x] 今日投入时间自动统计
+- [x] 人生领域任务自动进度
 - [x] 与现有 Obsidian Dashboard 工作流兼容
 
 ### Phase 3 · SIJI Lab
