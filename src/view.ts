@@ -504,47 +504,45 @@ export class HomeView extends ItemView {
   }
 
   private async startTask(task: TaskItem): Promise<void> {
-    const content = await this.plugin.app.vault.read(task.file);
-    const lines = content.split("\n");
-    if (task.line >= lines.length || task.done) return;
-    if (/<!-- qq:start=\d+ -->/.test(lines[task.line])) return;
-    lines[task.line] = lines[task.line]
-      .replace(/\s*<!-- qq:start=\d+ -->/, "")
-      .replace(/\s*$/, "") + " <!-- qq:start=" + Date.now() + " -->";
-    await this.plugin.app.vault.modify(task.file, lines.join("\n"));
+    if (task.done) return;
+    await this.plugin.app.vault.process(task.file, content => {
+      const lines = content.split("\n");
+      if (task.line >= lines.length) return content;
+      if (/<!-- qq:start=\d+ -->/.test(lines[task.line])) return content;
+      lines[task.line] = lines[task.line].replace(/\s*$/, "") + " <!-- qq:start=" + Date.now() + " -->";
+      return lines.join("\n");
+    });
     new Notice("已开始记录耗时");
     this.render();
   }
 
   private readMarker(source: string, marker: "start" | "duration" | "done"): number | undefined {
-    const match = source.match(new RegExp("<!-- qq:" + marker + "=(\\d+) -->"));
+    const match = source.match(new RegExp("<!-- qq:" + marker + "=(\\\\d+) -->"));
     return match ? Number(match[1]) : undefined;
   }
 
   private async toggleTask(task: TaskItem): Promise<void> {
-    const content = await this.plugin.app.vault.read(task.file);
-    const lines = content.split("\n");
-    if (task.line >= lines.length) return;
-
-    let line = lines[task.line];
-    const startMatch = line.match(/<!-- qq:start=(\d+) -->/);
-    if (!task.done && startMatch) {
-      const elapsed = Math.max(1, Math.round((Date.now() - Number(startMatch[1])) / 60000));
-      const total = (task.durationMinutes ?? 0) + elapsed;
-      const sessions = [...task.sessions, { startedAt: Number(startMatch[1]), minutes: elapsed }];
-      line = line
-        .replace(/\s*<!-- qq:start=\d+ -->/, "")
-        .replace(/\s*<!-- qq:duration=\d+ -->/, "")
-        .replace(/\s*<!-- qq:sessions=[^ ]+ -->/, "")
-        .replace(/\s*$/, "") + " <!-- qq:duration=" + total + " -->" + formatSessionMarker(sessions);
-      new Notice("任务完成 · 本次 " + this.formatDuration(elapsed) + " · 累计 " + this.formatDuration(total));
-    }
-    line = line.replace(/\s*<!-- qq:done=\d+ -->/, "");
-    if (!task.done) {
-      line = line.replace(/\s*$/, "") + " <!-- qq:done=" + Date.now() + " -->";
-    }
-    lines[task.line] = line.replace(/\[[ xX]\]/, task.done ? "[ ]" : "[x]");
-    await this.plugin.app.vault.modify(task.file, lines.join("\n"));
+    await this.plugin.app.vault.process(task.file, content => {
+      const lines = content.split("\n");
+      if (task.line >= lines.length) return content;
+      let line = lines[task.line];
+      const startMatch = line.match(/<!-- qq:start=(\d+) -->/);
+      if (!task.done && startMatch) {
+        const elapsed = Math.max(1, Math.round((Date.now() - Number(startMatch[1])) / 60000));
+        const total = (task.durationMinutes ?? 0) + elapsed;
+        const sessions = [...task.sessions, { startedAt: Number(startMatch[1]), minutes: elapsed }];
+        line = line
+          .replace(/\s*<!-- qq:start=\d+ -->/, "")
+          .replace(/\s*<!-- qq:duration=\d+ -->/, "")
+          .replace(/\s*<!-- qq:sessions=[^ ]+ -->/, "")
+          .replace(/\s*$/, "") + " <!-- qq:duration=" + total + " -->" + formatSessionMarker(sessions);
+        new Notice("任务完成 · 本次 " + this.formatDuration(elapsed) + " · 累计 " + this.formatDuration(total));
+      }
+      line = line.replace(/\s*<!-- qq:done=\d+ -->/, "");
+      if (!task.done) line = line.replace(/\s*$/, "") + " <!-- qq:done=" + Date.now() + " -->";
+      lines[task.line] = line.replace(/\[[ xX]\]/, task.done ? "[ ]" : "[x]");
+      return lines.join("\n");
+    });
     this.render();
   }
 
