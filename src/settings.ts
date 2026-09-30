@@ -38,6 +38,9 @@ export interface HomeSettings {
   weatherCity: string;
   countdownLabel: string;
   countdownDate: string;
+  homeTitle: string;
+  homeSubtitle: string;
+  wallpaperUrl: string;
 }
 
 export const CARD_META: Record<HomeCardId, { section: HomeSection; title: string }> = {
