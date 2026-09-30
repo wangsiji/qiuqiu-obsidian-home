@@ -232,15 +232,43 @@ export class HomeView extends ItemView {
       case "overview.capture": this.renderCaptureCard(grid); break;
       case "overview.links": this.renderQuickLinks(grid); break;
       case "overview.recent": this.renderRecentCard(grid); break;
+      case "overview.calendar": this.renderCalendarCard(grid); break;
+      case "overview.timeline": this.renderTimelineCard(grid); break;
+      case "overview.habits": this.renderHabitsCard(grid); break;
+      case "overview.inbox": this.renderInboxCard(grid); break;
       case "action.focus": this.renderFocusCard(grid); break;
       case "action.tasks": this.renderTaskCard(grid); break;
       case "action.projects": this.renderProjectsCard(grid); break;
+      case "action.due": this.renderTaskFilterCard(grid, "due"); break;
+      case "action.overdue": this.renderTaskFilterCard(grid, "overdue"); break;
+      case "action.next": this.renderNextActionsCard(grid); break;
+      case "action.milestones": this.renderMilestonesCard(grid); break;
+      case "action.goal": this.renderGoalCard(grid); break;
+      case "action.timer": this.renderTimerCard(grid); break;
+      case "action.countdown": this.renderCountdownCard(grid); break;
+      case "action.agenda": this.renderAgendaCard(grid); break;
       case "knowledge.flow": this.renderKnowledgeCard(grid); break;
       case "knowledge.review": this.renderReviewCard(grid); break;
       case "knowledge.stats": this.renderStatsCard(grid); break;
+      case "knowledge.tags": this.renderTagsCard(grid); break;
+      case "knowledge.unlinked": this.renderUnlinkedCard(grid); break;
+      case "knowledge.missing": this.renderMissingLinksCard(grid); break;
+      case "knowledge.heatmap": this.renderHeatmapCard(grid); break;
+      case "knowledge.workset": this.renderWorksetCard(grid); break;
+      case "knowledge.template": this.renderTemplateCard(grid); break;
+      case "knowledge.question": this.renderQuestionCard(grid); break;
+      case "knowledge.snippets": this.renderSnippetsCard(grid); break;
+      case "knowledge.video": this.renderVideoCard(grid); break;
       case "life.areas": this.renderAreaCard(grid); break;
       case "life.rhythm": this.renderLifeMetrics(grid); break;
       case "life.quote": this.renderQuoteCard(grid); break;
+      case "life.time": this.renderTimeProgressCard(grid); break;
+      case "life.world": this.renderWorldClockCard(grid); break;
+      case "life.weather": this.renderWeatherCard(grid); break;
+      case "life.noise": this.renderNoiseCard(grid); break;
+      case "life.search": this.renderMultiSearchCard(grid); break;
+      case "life.learning": this.renderLearningCard(grid); break;
+      case "life.integrations": this.renderIntegrationsCard(grid); break;
     }
   }
 
@@ -534,6 +562,158 @@ export class HomeView extends ItemView {
       }
     }
     return count;
+  }
+
+  private renderCalendarCard(grid: HTMLElement): void {
+    const card=this.card(grid,"日历","calendar-range");
+    const now=new Date(); const days=["一","二","三","四","五","六","日"];
+    card.createDiv("qq-calendar-month").setText(now.toLocaleDateString("zh-CN",{year:"numeric",month:"long"}));
+    const row=card.createDiv("qq-calendar-week");
+    days.forEach(d=>row.createSpan().setText(d));
+    const first=new Date(now.getFullYear(),now.getMonth(),1).getDay()||7;
+    const count=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const gridEl=card.createDiv("qq-calendar-grid");
+    for(let i=1;i<first;i++) gridEl.createSpan();
+    for(let d=1;d<=count;d++){const cell=gridEl.createEl("button",{text:String(d)});if(d===now.getDate())cell.addClass("qq-calendar-today");cell.addEventListener("click",()=>{const date=new Date(now.getFullYear(),now.getMonth(),d);void this.openDateNote(date);});}
+  }
+
+  private async openDateNote(date: Date): Promise<void> {
+    const path=dailyPath(this.plugin.settings,date); const file=this.plugin.app.vault.getAbstractFileByPath(path);
+    if(file instanceof TFile) await this.plugin.app.workspace.getLeaf("tab").openFile(file);
+    else if(date.toDateString()===new Date().toDateString()) await this.plugin.openToday();
+    else new Notice("这一天还没有日记。");
+  }
+
+  private renderTimelineCard(grid: HTMLElement): void {
+    const card=this.card(grid,"今日时间线","list-tree");
+    const file=this.plugin.app.vault.getAbstractFileByPath(dailyPath(this.plugin.settings));
+    if(!(file instanceof TFile)){card.createDiv("qq-empty-state").setText("今天还没有日记。");return;}
+    void this.plugin.app.vault.read(file).then(text=>{const times=[...text.matchAll(/(?:^|\\n)\\s*(?:[-*]\\s*)?(\\d{1,2}:\\d{2})\\s+(.+)/g)].slice(0,8);if(!times.length)card.createDiv("qq-empty-state").setText("在日记里写 09:30 开始的记录，这里会自动出现。");times.forEach(m=>{const row=card.createDiv("qq-note-row");row.createDiv("qq-note-title").setText(m[1]+" · "+m[2]);});});
+  }
+
+  private renderHabitsCard(grid: HTMLElement): void {
+    const card=this.card(grid,"习惯打卡","check-circle");
+    const input=card.createEl("input",{type:"text",placeholder:"习惯名，例如：跑步"}); const today=card.createDiv("qq-habit-row");
+    const key="qq-habit-"+new Date().toISOString().slice(0,10);
+    const file=this.plugin.app.vault.getAbstractFileByPath(dailyPath(this.plugin.settings));
+    this.button(card,"记录一次","check",async()=>{const value=input.value.trim();if(!value)return;await this.appendToFile(dailyPath(this.plugin.settings),"- [x] "+value+" <!-- "+key+" -->");input.value="";today.setText("已记录 · "+value);});
+    today.setText(file instanceof TFile?"习惯记录保存在今日日记":"从今天开始记录。");
+  }
+
+  private renderInboxCard(grid: HTMLElement): void {
+    const card=this.card(grid,"收件箱","inbox"); const file=this.plugin.app.vault.getAbstractFileByPath(this.plugin.settings.inboxPath);
+    if(!(file instanceof TFile)){card.createDiv("qq-empty-state").setText("Inbox 还不存在。");this.button(card,"创建 Inbox","plus",async()=>{await this.appendToFile(this.plugin.settings.inboxPath,"- ");this.render();});return;}
+    card.createDiv("qq-muted").setText("最后编辑 · "+window.moment(file.stat.mtime).fromNow());
+    void this.plugin.app.vault.read(file).then(text=>{const lines=text.split("\n").filter(l=>/^\\s*[-*+]\\s+/.test(l)).slice(-5).reverse();lines.forEach(line=>card.createDiv("qq-note-row").setText(line.replace(/^\\s*[-*+]\\s+/,"")));});
+    this.button(card,"打开 Inbox","arrow-up-right",()=>void this.plugin.openTarget(this.plugin.settings.inboxPath));
+  }
+
+  private async collectPlainTasks(): Promise<TaskItem[]> { return this.collectTasks(); }
+
+  private renderTaskFilterCard(grid: HTMLElement, mode:"due"|"overdue"): void {
+    const card=this.card(grid,mode==="due"?"今日到期":"逾期任务",mode==="due"?"calendar-clock":"alert-circle");
+    void this.collectPlainTasks().then(tasks=>{const items=tasks.filter(t=>{const source=this.plugin.app.metadataCache.getFileCache(t.file)?.listItems?.find(i=>i.position.start.line===t.line);return source? (mode==="due"?true:!t.done):false;}).filter(t=>mode==="overdue"?!t.done:t.file.path.includes(dailyPath(this.plugin.settings).split("/")[0]));items.slice(0,6).forEach(t=>this.renderTaskRow(card,t));if(!items.length)card.createDiv("qq-empty-state").setText("没有需要处理的任务。");});
+  }
+
+  private renderNextActionsCard(grid: HTMLElement): void {
+    const card=this.card(grid,"项目下一步","arrow-right");
+    const open=this.plugin.settings.areas.flatMap(area=>area.path?this.tasksInPath(area.path):[]).filter(t=>!t.done).slice(0,6);
+    if(!open.length)card.createDiv("qq-empty-state").setText("没有发现未完成的项目任务。");
+    open.forEach(t=>{const row=card.createDiv("qq-note-row");row.createDiv("qq-note-title").setText(t.text);row.createDiv("qq-note-meta").setText(t.file.path);row.addEventListener("click",()=>void this.plugin.app.workspace.getLeaf("tab").openFile(t.file));});
+  }
+
+  private tasksInPath(path:string): TaskItem[] {
+    const out:TaskItem[]=[]; for(const file of this.plugin.app.vault.getMarkdownFiles()){if(!(file.path.startsWith(path+"/")||file.path===path))continue;const lines=(this.plugin.app.metadataCache.getFileCache(file)?.listItems??[]).filter(i=>typeof i.task==="string");for(const item of lines){const source="";out.push({file,line:item.position.start.line,text:"任务 · "+file.basename,done:item.task?.toLowerCase()!==" "});}}return out;
+  }
+
+  private renderMilestonesCard(grid: HTMLElement): void {
+    const card=this.card(grid,"近期里程碑","milestone"); const files=this.plugin.app.vault.getMarkdownFiles().filter(f=>f.stat.mtime>Date.now()-30*86400000).sort((a,b)=>b.stat.mtime-a.stat.mtime).slice(0,6);
+    files.forEach(f=>{const row=card.createDiv("qq-note-row");row.createDiv("qq-note-title").setText(f.basename);row.createDiv("qq-note-meta").setText(window.moment(f.stat.mtime).fromNow());row.addEventListener("click",()=>void this.plugin.app.workspace.getLeaf("tab").openFile(f));});
+  }
+
+  private renderGoalCard(grid: HTMLElement): void {
+    const card=this.card(grid,"目标进度","target"); const total=this.plugin.app.vault.getMarkdownFiles().length;const active=this.plugin.app.vault.getMarkdownFiles().filter(f=>f.stat.mtime>Date.now()-7*86400000).length;card.createDiv("qq-number").setText(total?Math.round(active/total*100)+"%":"0%");card.createDiv("qq-muted").setText("近 7 天活跃度，可作为目标执行温度计。");
+  }
+
+  private renderTimerCard(grid: HTMLElement): void {
+    const card=this.card(grid,"专注计时","timer");const display=card.createDiv("qq-timer-display").setText("25:00");let remaining=25*60;let timer:number|undefined;
+    const controls=card.createDiv("qq-card-actions");this.button(controls,"开始","play",()=>{if(timer)return;timer=window.setInterval(()=>{remaining--;display.setText(Math.floor(remaining/60).toString().padStart(2,"0")+":"+String(remaining%60).padStart(2,"0"));if(remaining<=0){window.clearInterval(timer);timer=undefined;new Notice("专注完成");}},1000);});this.button(controls,"重置","rotate-ccw",()=>{if(timer)window.clearInterval(timer);timer=undefined;remaining=25*60;display.setText("25:00");});
+  }
+
+  private renderCountdownCard(grid: HTMLElement): void {
+    const card=this.card(grid,"倒计时","hourglass");const label=card.createEl("input",{type:"text",placeholder:"事件名称"});label.value=this.plugin.settings.countdownLabel;const date=card.createEl("input",{type:"datetime-local"});date.value=this.plugin.settings.countdownDate;const out=card.createDiv("qq-number");
+    const refresh=()=>{const ms=Date.parse(date.value)-Date.now();out.setText(ms>0?this.formatDuration(Math.ceil(ms/60000)):"已到时间");};date.addEventListener("change",async()=>{this.plugin.settings.countdownDate=date.value;await this.plugin.saveSettings();refresh();});label.addEventListener("change",async()=>{this.plugin.settings.countdownLabel=label.value;await this.plugin.saveSettings();});refresh();card.createDiv("qq-muted").setText(label.value||"自定义倒计时");
+  }
+
+  private renderAgendaCard(grid: HTMLElement): void {
+    const card=this.card(grid,"日程","calendar-days");card.createDiv("qq-muted").setText("支持读取库内 .ics 文件；订阅地址可通过快捷入口打开。");
+    const files=this.plugin.app.vault.getFiles().filter(f=>f.extension==="ics").slice(0,5);files.forEach(f=>card.createDiv("qq-note-row").setText(f.path));
+  }
+
+  private renderTagsCard(grid: HTMLElement): void {
+    const card=this.card(grid,"常用标签","tags");const counts=new Map<string,number>();this.plugin.app.vault.getMarkdownFiles().forEach(f=>(this.plugin.app.metadataCache.getFileCache(f)?.tags??[]).forEach(t=>counts.set(t.tag,(counts.get(t.tag)??0)+1)));[...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12).forEach(([tag,n])=>card.createSpan("qq-tag").setText(tag.replace(/^#/,"")+" · "+n));
+  }
+
+  private renderUnlinkedCard(grid: HTMLElement): void {
+    const card=this.card(grid,"待连接笔记","link-2");const files=this.plugin.app.vault.getMarkdownFiles().filter(f=>{const links=this.plugin.app.metadataCache.getFileCache(f)?.links??[];return links.length===0;}).slice(0,6);files.forEach(f=>{const row=card.createDiv("qq-note-row");row.setText(f.basename);row.addEventListener("click",()=>void this.plugin.app.workspace.getLeaf("tab").openFile(f));});
+  }
+
+  private renderMissingLinksCard(grid: HTMLElement): void {
+    const card=this.card(grid,"待补全链接","link");const unresolved=this.plugin.app.metadataCache.unresolvedLinks;const items=Object.entries(unresolved).filter(([,n])=>Object.values(n).some(v=>v>0)).slice(0,8);items.forEach(([path])=>card.createDiv("qq-note-row").setText(path));
+    if(!items.length)card.createDiv("qq-empty-state").setText("没有发现未解析链接。");
+  }
+
+  private renderHeatmapCard(grid: HTMLElement): void {
+    const card=this.card(grid,"笔记热力图","grid-3x3");const wrap=card.createDiv("qq-heatmap");const now=Date.now();for(let i=41;i>=0;i--){const day=new Date(now-i*86400000);const count=this.plugin.app.vault.getMarkdownFiles().filter(f=>f.stat.mtime>=new Date(day.getFullYear(),day.getMonth(),day.getDate()).getTime()&&f.stat.mtime<new Date(day.getFullYear(),day.getMonth(),day.getDate()+1).getTime()).length;wrap.createSpan("qq-heat-cell").setAttribute("data-level",String(Math.min(4,Math.ceil(count/2))));}
+  }
+
+  private renderWorksetCard(grid: HTMLElement): void {
+    const card=this.card(grid,"笔记工作集","layers");const paths=this.plugin.settings.worksetPaths.length?this.plugin.settings.worksetPaths:[""];const files=this.plugin.app.vault.getMarkdownFiles().filter(f=>!paths[0]||f.path.startsWith(paths[0])).sort((a,b)=>b.stat.mtime-a.stat.mtime).slice(0,6);files.forEach(f=>{const row=card.createDiv("qq-note-row");row.setText(f.basename);row.addEventListener("click",()=>void this.plugin.app.workspace.getLeaf("tab").openFile(f));});
+  }
+
+  private renderTemplateCard(grid: HTMLElement): void {
+    const card=this.card(grid,"模板速建","copy-plus");const files=this.plugin.app.vault.getMarkdownFiles().filter(f=>f.path.startsWith(this.plugin.settings.templateFolder+"/")).slice(0,8);files.forEach(f=>this.button(card,f.basename,"file-plus",async()=>{const name=window.prompt("新笔记名称",f.basename);if(!name)return;const source=await this.plugin.app.vault.read(f);const path=(this.plugin.settings.newNoteFolder?this.plugin.settings.newNoteFolder+"/":"")+name.replace(/[\\/:*?"<>|]/g,"-")+".md";await this.plugin.ensureFolder(this.plugin.settings.newNoteFolder);await this.plugin.app.vault.create(path,source);await this.plugin.app.workspace.getLeaf("tab").openFile(path);}));
+    if(!files.length)card.createDiv("qq-empty-state").setText("在 "+this.plugin.settings.templateFolder+" 放入 Markdown 模板。");
+  }
+
+  private renderQuestionCard(grid: HTMLElement): void {
+    const card=this.card(grid,"每日一问","help-circle");const q=this.plugin.settings.question;card.createDiv("qq-review-title").setText(q);const input=card.createEl("textarea",{placeholder:"写下今天的答案…"});input.rows=3;this.button(card,"写入今日日记","pen-line",async()=>{const value=input.value.trim();if(!value)return;await this.appendToFile(dailyPath(this.plugin.settings),"- Q: "+q+"\\n- A: "+value);input.value="";new Notice("已记录");});
+  }
+
+  private renderSnippetsCard(grid: HTMLElement): void {
+    const card=this.card(grid,"常用片段","text-quote");const file=this.plugin.app.vault.getAbstractFileByPath(this.plugin.settings.snippetPath);if(!(file instanceof TFile)){card.createDiv("qq-empty-state").setText("配置一个片段文件即可。");return;}void this.plugin.app.vault.read(file).then(text=>text.split("\n").filter(Boolean).slice(0,6).forEach(line=>{const row=card.createDiv("qq-note-row");row.setText(line.replace(/^[-*+]\s+/,""));row.addEventListener("click",()=>navigator.clipboard?.writeText(row.textContent??""));}));
+  }
+
+  private renderVideoCard(grid: HTMLElement): void {
+    const card=this.card(grid,"视频笔记","video");const input=card.createEl("input",{type:"url",placeholder:"粘贴视频链接"});const title=card.createEl("input",{type:"text",placeholder:"笔记标题"});this.button(card,"创建视频笔记","file-plus",async()=>{const url=input.value.trim(),name=title.value.trim();if(!url||!name)return;const path=(this.plugin.settings.newNoteFolder?this.plugin.settings.newNoteFolder+"/":"")+name+".md";await this.plugin.ensureFolder(this.plugin.settings.newNoteFolder);await this.plugin.app.vault.create(path,"---\\nsource: "+url+"\\n---\\n\\n# "+name+"\\n\\n");await this.plugin.app.workspace.getLeaf("tab").openFile(path);});
+  }
+
+  private renderTimeProgressCard(grid: HTMLElement): void {
+    const card=this.card(grid,"时间进度","clock-3");const now=new Date();const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();const end=start+86400000;const p=Math.round((Date.now()-start)/(end-start)*100);card.createDiv("qq-number").setText(p+"%");card.createDiv("qq-muted").setText("今天已经过去");
+  }
+
+  private renderWorldClockCard(grid: HTMLElement): void {
+    const card=this.card(grid,"世界时钟","globe-2");[["东京","Asia/Tokyo"],["上海","Asia/Shanghai"],["纽约","America/New_York"],["伦敦","Europe/London"]].forEach(([name,zone])=>{const row=card.createDiv("qq-note-row");row.createDiv("qq-note-title").setText(name);row.createDiv("qq-note-meta").setText(new Intl.DateTimeFormat("zh-CN",{timeZone:zone,hour:"2-digit",minute:"2-digit"}).format(new Date()));});
+  }
+
+  private renderWeatherCard(grid: HTMLElement): void {
+    const card=this.card(grid,"天气","cloud-sun");const city=this.plugin.settings.weatherCity;if(!city){card.createDiv("qq-empty-state").setText("在设置里填写城市后显示天气。");return;}card.createDiv("qq-muted").setText(city+" · 可通过快捷入口打开天气服务。");
+  }
+
+  private renderNoiseCard(grid: HTMLElement): void {
+    const card=this.card(grid,"专注白噪音","waves");card.createDiv("qq-muted").setText("本地生成，不请求网络。");let ctx:AudioContext|undefined;let source:AudioBufferSourceNode|undefined;this.button(card,"播放","play",()=>{if(ctx)return;ctx=new AudioContext();const buffer=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);const data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;source=ctx.createBufferSource();source.buffer=buffer;source.loop=true;source.connect(ctx.destination);source.start();});this.button(card,"停止","square",()=>{source?.stop();void ctx?.close();ctx=undefined;source=undefined;});
+  }
+
+  private renderMultiSearchCard(grid: HTMLElement): void {
+    const card=this.card(grid,"多站搜索","search");const input=card.createEl("input",{type:"search",placeholder:"输入关键词"});[["Google","https://www.google.com/search?q="],["Bing","https://www.bing.com/search?q="],["GitHub","https://github.com/search?q="],["YouTube","https://www.youtube.com/results?search_query="]].forEach(([name,url])=>this.button(card,name,"external-link",()=>{const q=input.value.trim();if(q)window.open(url+encodeURIComponent(q),"_blank","noopener,noreferrer");}));
+  }
+
+  private renderLearningCard(grid: HTMLElement): void {
+    const card=this.card(grid,"学习工具","graduation-cap");[["论文","https://scholar.google.com/scholar?q="],["电子书","https://www.google.com/search?tbm=bks&q="],["视频","https://www.youtube.com/results?search_query="],["词典","https://www.google.com/search?q=define+"]].forEach(([name,url])=>this.button(card,name,"search",()=>{const q=window.prompt(name+"关键词");if(q)window.open(url+encodeURIComponent(q),"_blank","noopener,noreferrer");}));
+  }
+
+  private renderIntegrationsCard(grid: HTMLElement): void {
+    const card=this.card(grid,"插件工具","puzzle");const checks=[["QuickAdd","quickadd"],["Dataview","dataview"],["Omnisearch","omnisearch"],["Excalidraw","excalidraw"],["Kanban","kanban"],["Spaced Repetition","spaced-repetition"]];checks.forEach(([name,id])=>{const available=this.plugin.app.plugins.enabledPlugins.has(id);this.button(card,name,available?"check":"download",()=>{if(available)new Notice(name+" 已启用，可从快捷入口使用。");else{const app=this.app as typeof this.app & {setting?:{open():void;openTabById(id:string):void}};app.setting?.open();app.setting?.openTabById("community-plugins");}});});
   }
 
   private countNotes(path: string): number {
