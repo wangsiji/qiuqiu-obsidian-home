@@ -11,6 +11,7 @@ interface TaskItem {
   done: boolean;
   startedAt?: number;
   durationMinutes?: number;
+  completedAt?: number;
 }
 
 const META: Record<HomeSection, { label: string; icon: string; eyebrow: string }> = {
@@ -353,13 +354,49 @@ export class HomeView extends ItemView {
     const tasks = await this.collectTasks();
     const open = tasks.filter(task => !task.done);
     const tracked = tasks.reduce((sum, task) => sum + (task.durationMinutes ?? 0), 0);
+    const doing = open.filter(task => task.startedAt).sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
+    const recentDone = tasks
+      .filter(task => task.done && task.completedAt)
+      .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
+      .slice(0, 3);
     const progress = card.querySelector(".qq-progress-row");
     if (progress instanceof HTMLElement) {
       progress.setText(open.length + " 件未完成 · 已记录 " + this.formatDuration(tracked));
     }
 
-    open.slice(0, 7).forEach(task => {
-      const row = card.createDiv("qq-task-row");
+    const next = open.find(task => !task.startedAt) ?? open[0];
+    if (next) {
+      const nextRow = card.createDiv("qq-next-action");
+      nextRow.createDiv("qq-next-label").setText("下一步");
+      nextRow.createDiv("qq-next-text").setText(next.text);
+      this.button(nextRow, next.startedAt ? "继续" : "开始", "play", () => void this.startTask(next));
+    }
+
+    if (doing.length) {
+      card.createDiv("qq-task-group-label").setText("进行中");
+      doing.slice(0, 3).forEach(task => this.renderTaskRow(card, task));
+    }
+
+    const remaining = open.filter(task => !doing.includes(task));
+    if (remaining.length) {
+      card.createDiv("qq-task-group-label").setText("待处理");
+      remaining.slice(0, 4).forEach(task => this.renderTaskRow(card, task));
+    }
+
+    if (recentDone.length) {
+      card.createDiv("qq-task-group-label").setText("最近完成");
+      recentDone.forEach(task => {
+        const row = card.createDiv("qq-task-done-row");
+        row.createDiv("qq-task-text").setText(task.text);
+        row.createDiv("qq-task-timing").setText((task.durationMinutes ? this.formatDuration(task.durationMinutes) + " · " : "") + moment(task.completedAt).fromNow());
+      });
+    }
+
+    if (!open.length) card.createDiv("qq-empty-state").setText("今天很干净。");
+  }
+
+  private renderTaskRow(card: HTMLElement, task: TaskItem): void {
+    const row = card.createDiv("qq-task-row");
       const box = row.createEl("input", { type: "checkbox" });
       const copy = row.createDiv("qq-task-copy");
       copy.createDiv("qq-task-text").setText(task.text);
@@ -377,8 +414,8 @@ export class HomeView extends ItemView {
         }
       });
       box.addEventListener("change", () => void this.toggleTask(task));
-    });
-    if (!open.length) card.createDiv("qq-empty-state").setText("今天很干净。");
+    box.checked = task.done;
+    box.addEventListener("change", () => void this.toggleTask(task));
   }
 
   private formatDuration(minutes: number): string {
@@ -427,6 +464,11 @@ export class HomeView extends ItemView {
     this.render();
   }
 
+  private readMarker(source: string, marker: "start" | "duration" | "done"): number | undefined {
+    const match = source.match(new RegExp("<!-- qq:" + marker + "=(\\d+) -->"));
+    return match ? Number(match[1]) : undefined;
+  }
+
   private async toggleTask(task: TaskItem): Promise<void> {
     const content = await this.plugin.app.vault.read(task.file);
     const lines = content.split("\n");
@@ -442,6 +484,10 @@ export class HomeView extends ItemView {
         .replace(/\s*<!-- qq:duration=\d+ -->/, "")
         .replace(/\s*$/, "") + " <!-- qq:duration=" + total + " -->";
       new Notice("任务完成 · 本次 " + this.formatDuration(elapsed) + " · 累计 " + this.formatDuration(total));
+    }
+    line = line.replace(/\s*<!-- qq:done=\d+ -->/, "");
+    if (!task.done) {
+      line = line.replace(/\s*$/, "") + " <!-- qq:done=" + Date.now() + " -->";
     }
     lines[task.line] = line.replace(/\[[ xX]\]/, task.done ? "[ ]" : "[x]");
     await this.plugin.app.vault.modify(task.file, lines.join("\n"));
