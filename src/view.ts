@@ -664,7 +664,7 @@ export class HomeView extends ItemView {
   }
 
   private renderTimerCard(grid: HTMLElement): void {
-    const card=this.card(grid,"专注计时","timer");const display=card.createDiv("qq-timer-display").setText("25:00");let remaining=25*60;let timer:number|undefined;
+    const card=this.card(grid,"专注计时","timer");const display=card.createDiv("qq-timer-display");display.setText("25:00");let remaining=25*60;let timer:number|undefined;
     const controls=card.createDiv("qq-card-actions");this.button(controls,"开始","play",()=>{if(timer)return;timer=window.setInterval(()=>{remaining--;display.setText(Math.floor(remaining/60).toString().padStart(2,"0")+":"+String(remaining%60).padStart(2,"0"));if(remaining<=0){window.clearInterval(timer);timer=undefined;new Notice("专注完成");}},1000);});this.button(controls,"重置","rotate-ccw",()=>{if(timer)window.clearInterval(timer);timer=undefined;remaining=25*60;display.setText("25:00");});
   }
 
@@ -713,7 +713,7 @@ export class HomeView extends ItemView {
   }
 
   private renderVideoCard(grid: HTMLElement): void {
-    const card=this.card(grid,"视频笔记","video");const input=card.createEl("input",{type:"url",placeholder:"粘贴视频链接"});const title=card.createEl("input",{type:"text",placeholder:"笔记标题"});this.button(card,"创建视频笔记","file-plus",async()=>{const url=input.value.trim(),name=title.value.trim();if(!url||!name)return;const path=(this.plugin.settings.newNoteFolder?this.plugin.settings.newNoteFolder+"/":"")+name+".md";await this.plugin.ensureFolder(this.plugin.settings.newNoteFolder);await this.plugin.app.vault.create(path,"---\\nsource: "+url+"\\n---\\n\\n# "+name+"\\n\\n");await this.plugin.app.workspace.getLeaf("tab").openFile(path);});
+    const card=this.card(grid,"视频笔记","video");const input=card.createEl("input",{type:"url",placeholder:"粘贴视频链接"});const title=card.createEl("input",{type:"text",placeholder:"笔记标题"});this.button(card,"创建视频笔记","file-plus",async()=>{const url=input.value.trim(),name=title.value.trim();if(!url||!name)return;const path=(this.plugin.settings.newNoteFolder?this.plugin.settings.newNoteFolder+"/":"")+name+".md";await this.plugin.ensureFolder(this.plugin.settings.newNoteFolder);const created=await this.plugin.app.vault.create(path,"---\nsource: "+url+"\n---\n\n# "+name+"\n\n");await this.plugin.app.workspace.getLeaf("tab").openFile(created);});
   }
 
   private renderTimeProgressCard(grid: HTMLElement): void {
@@ -741,7 +741,7 @@ export class HomeView extends ItemView {
   }
 
   private renderIntegrationsCard(grid: HTMLElement): void {
-    const card=this.card(grid,"插件工具","puzzle");const checks=[["QuickAdd","quickadd"],["Dataview","dataview"],["Omnisearch","omnisearch"],["Excalidraw","excalidraw"],["Kanban","kanban"],["Spaced Repetition","spaced-repetition"]];checks.forEach(([name,id])=>{const available=this.plugin.app.plugins.enabledPlugins.has(id);this.button(card,name,available?"check":"download",()=>{if(available)new Notice(name+" 已启用，可从快捷入口使用。");else{const app=this.app as typeof this.app & {setting?:{open():void;openTabById(id:string):void}};app.setting?.open();app.setting?.openTabById("community-plugins");}});});
+    const card=this.card(grid,"插件工具","puzzle");const checks=[["QuickAdd","quickadd"],["Dataview","dataview"],["Omnisearch","omnisearch"],["Excalidraw","excalidraw"],["Kanban","kanban"],["Spaced Repetition","spaced-repetition"]];checks.forEach(([name,id])=>{const available=(this.app as unknown as {plugins:{enabledPlugins:Set<string>}}).plugins.enabledPlugins.has(id);this.button(card,name,available?"check":"download",()=>{if(available)new Notice(name+" 已启用，可从快捷入口使用。");else{const app=this.app as typeof this.app & {setting?:{open():void;openTabById(id:string):void}};app.setting?.open();app.setting?.openTabById("community-plugins");}});});
   }
 
   private countNotes(path: string): number {

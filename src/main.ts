@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, Notice, TFile } from "obsidian";
+import { Plugin, WorkspaceLeaf, Notice, TFile, TFolder } from "obsidian";
 import { HomeView, VIEW_TYPE_QIUQIU_HOME } from "./view";
 import { DEFAULT_SETTINGS, HomeSettings, dailyPath, normalizeSettings } from "./settings";
 import { QiuqiuSettingTab } from "./settings-tab";
@@ -90,7 +90,7 @@ export default class QiuqiuHomePlugin extends Plugin {
     if (file instanceof TFolder) {
       const explorer = this.app.workspace.getLeavesOfType("file-explorer")[0];
       if (explorer?.view && "revealInFolder" in explorer.view) {
-        try { const candidate=this.app.vault.getMarkdownFiles().find(f=>f.path.startsWith(file.path+"/")); if(candidate) (explorer.view as { revealInFolder: (file:TFile)=>void }).revealInFolder(candidate); } catch { /* best effort */ }
+        try { const candidate=this.app.vault.getMarkdownFiles().find(f=>f.path.startsWith(((file as TFolder).path)+"/")); if(candidate) (explorer.view as { revealInFolder: (file:TFile)=>void }).revealInFolder(candidate); } catch { /* best effort */ }
       }
       new Notice("已定位到目录：" + target);
       return;

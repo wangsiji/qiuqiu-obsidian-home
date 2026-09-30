@@ -93,7 +93,7 @@ export const DEFAULT_SETTINGS: HomeSettings = {
   ],
   sectionOrder:["overview","action","knowledge","life"], cardOrder:cloneCardOrder(DEFAULT_CARD_ORDER), hiddenCards:[],
   quote:"把注意力放回真正重要的事情上。", taskLookbackDays:14, templateFolder:"Templates", snippetPath:"00-Snippets.md",
-  question:"今天什么事情最值得留下？", worksetPaths:[], weatherCity:"", countdownLabel:"", countdownDate:""
+  question:"今天什么事情最值得留下？", worksetPaths:[], weatherCity:"", countdownLabel:"", countdownDate:"", homeTitle:"Qiuqiu Home", homeSubtitle:"你的第二大脑，从这里开始。", wallpaperUrl:""
 };
 
 function isSection(value: unknown): value is HomeSection { return value==="overview"||value==="action"||value==="knowledge"||value==="life"; }
