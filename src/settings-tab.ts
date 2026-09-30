@@ -78,6 +78,9 @@ export class QiuqiuSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
       }));
 
+    new Setting(el).setName("首页标题").addText(t=>t.setValue(this.plugin.settings.homeTitle).onChange(async v=>{this.plugin.settings.homeTitle=v;await this.plugin.saveSettings();}));
+    new Setting(el).setName("首页副标题").addText(t=>t.setValue(this.plugin.settings.homeSubtitle).onChange(async v=>{this.plugin.settings.homeSubtitle=v;await this.plugin.saveSettings();}));
+    new Setting(el).setName("壁纸 URL").setDesc("可填本地可访问图片地址；留空保持纯色背景。").addText(t=>t.setValue(this.plugin.settings.wallpaperUrl).onChange(async v=>{this.plugin.settings.wallpaperUrl=v.trim();await this.plugin.saveSettings();}));
     new Setting(el).setName("模板目录").setDesc("模板速建模块读取的 Markdown 目录。").addText(t=>t.setValue(this.plugin.settings.templateFolder).onChange(async v=>{this.plugin.settings.templateFolder=v.trim();await this.plugin.saveSettings();}));
     new Setting(el).setName("常用片段文件").setDesc("常用片段模块读取的 Markdown 文件。").addText(t=>t.setValue(this.plugin.settings.snippetPath).onChange(async v=>{this.plugin.settings.snippetPath=v.trim();await this.plugin.saveSettings();}));
     new Setting(el).setName("每日一问").addText(t=>t.setValue(this.plugin.settings.question).onChange(async v=>{this.plugin.settings.question=v.trim();await this.plugin.saveSettings();}));
